@@ -50,9 +50,15 @@ npm run check        # test + explore
 
 - 不変条件テスト 14 件：PASS
 - UIの矛盾検出 5 件：PASS
-- 探索テスト 10,000 ケース × シード2種：違反 0 件
-- **adversarial-review（モード2）：未実施**
-- **release-gate：未実施。これを通すまで外部公開しない**
+- 起動直後の基準配置テスト 2 件（INIT-01/02・回帰）：PASS
+- テスト合計 21 件：PASS（`npm run check`）
+- 探索テスト 10,000 ケース × シード3種（既定・12345・99999）：違反 0 件
+- **adversarial-review（モード2）：実施済み（2026-07-26）**。Claude・codex の両方が挙げた
+  「老健 起動直後の丸め矛盾（0.0人不足・下限0.1人割れ）」1件を修正（commit 8969f07）。
+  仕分けの全体は `review/adversarial-review-結果.md`／codex側は `review/codex-findings.md`
+- **release-gate：実施済み（2026-07-26・🟡 条件付き可）。`review/release-gate記録.md`。
+  §0不変条件シートの整備（または既存テスト群での代替受容）ほか P1〜P2 の判断を
+  通すまで外部公開しない**
 
 ## 数値の検証状態（すべて未検証）
 
