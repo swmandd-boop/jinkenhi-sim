@@ -615,11 +615,14 @@ var SERVICES = {
     };
   }
 
-  /* 初期行（実配置＝基準、非正規0） */
+  /* 初期行（実配置＝基準、非正規0）
+     基準は 0.1 単位で切り上げて置く（CEIL）。四捨五入だと基準を下回る側に
+     丸める職種が生じ（例: 老健の介護 std=21.905 → 21.9）、起動直後に
+     「実配置＝基準」と謳いながら 0.0 人不足・下限0.1人割れの矛盾表示が出るため。 */
   function initialRows(svcKey, sizes, week){
     return buildStandard(svcKey, sizes, week).map(function(r){
       return { key:r.key, name:r.name, note:r.note,
-               n: Math.round((r.std || 0) * 10) / 10, hi:0, a:r.a };
+               n: Math.ceil((r.std || 0) * 10 - 1e-9) / 10, hi:0, a:r.a };
     });
   }
 
