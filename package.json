@@ -1,0 +1,17 @@
+{
+  "name": "swmd-jinkenhi-sim",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "SWMD 人件費トレードオフ・シミュレーター（単一HTML）と、その計算層の検証",
+  "scripts": {
+    "build": "node tools/extract-engine.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "explore": "npm run build && node tests/explore.mjs",
+    "dump": "npm run build && node tools/dump-screen.mjs",
+    "check": "npm run test && npm run explore"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}

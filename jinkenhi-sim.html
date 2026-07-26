@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>人件費トレードオフ・シミュレーター v0.3 | SWMD</title>
+<style>
+:root{
+  --ink:#101F2B; --ink-2:#4A5C68; --paper:#E4EAEE; --surface:#FBFCFD; --rule:#C5D0D7;
+  --ai:#1B4965; --take:#2A7F72; --shu:#B23A2E; --kohaku:#B8801F;
+  --mincho:"Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP",serif;
+  --gothic:"Hiragino Sans","Yu Gothic","YuGothic","Noto Sans JP",system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--gothic);font-size:15px;line-height:1.7;-webkit-text-size-adjust:100%}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 72px}
+.masthead{border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:26px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--ink-2);text-transform:uppercase}
+h1{font-family:var(--mincho);font-size:29px;font-weight:600;letter-spacing:.02em;margin:6px 0 4px;line-height:1.35}
+.lede{color:var(--ink-2);font-size:14px;max-width:64ch;margin:0}
+.cols{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:22px;align-items:start}
+@media(max-width:880px){.cols{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:18px}
+.panel + .panel{margin-top:18px}
+.panel h2{font-family:var(--mincho);font-size:16px;font-weight:600;margin:0 0 14px;padding-bottom:8px;
+  border-bottom:1px solid var(--rule);display:flex;align-items:baseline;gap:9px;justify-content:space-between}
+.panel h2 .tag{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ink-2);font-weight:400}
+.field{margin-bottom:13px}
+.field:last-child{margin-bottom:0}
+label{display:block;font-size:12.5px;color:var(--ink-2);margin-bottom:4px;letter-spacing:.02em}
+.inline{display:flex;align-items:center;gap:7px}
+input[type=number],input[type=text],select{font-family:var(--mono);font-size:14px;color:var(--ink);background:#fff;
+  border:1px solid var(--rule);border-radius:2px;padding:7px 8px;width:100%;text-align:right;font-variant-numeric:tabular-nums}
+select,input[type=text]{text-align:left;font-family:var(--gothic)}
+input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid var(--kohaku);outline-offset:1px}
+.unit{font-size:12px;color:var(--ink-2);white-space:nowrap;font-family:var(--mono)}
+.hint{font-size:11.5px;color:var(--ink-2);margin:4px 0 0;line-height:1.55}
+.chk{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink);margin:0 0 10px;cursor:pointer}
+.chk input{width:auto;margin:0}
+input[readonly]{background:#EEF2F5;color:var(--ink-2)}
+.seg{display:flex;border:1px solid var(--rule);border-radius:2px;overflow:hidden;margin-bottom:14px}
+.seg button{flex:1;border:0;background:#fff;color:var(--ink-2);font-family:var(--gothic);font-size:12.5px;padding:8px 4px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--ai);color:#fff}
+.readout{border-top:1px solid var(--rule);margin-top:14px;padding-top:12px}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:3px 0}
+.row .k{font-size:12.5px;color:var(--ink-2)}
+.row .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px}
+.row.lead .v{font-size:19px;font-weight:600}
+.row.lead .k{color:var(--ink);font-weight:600}
+.chartbox{background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:18px}
+.chartbox h2{font-family:var(--mincho);font-size:16px;font-weight:600;margin:0 0 2px}
+.chartnote{font-size:12.5px;color:var(--ink-2);margin:0 0 12px}
+svg{display:block;width:100%;height:auto;touch-action:none;cursor:ew-resize}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:11.5px;color:var(--ink-2)}
+.legend i{display:inline-block;width:18px;height:0;border-top-width:2px;border-top-style:solid;vertical-align:middle;margin-right:5px}
+.ratiobar{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--rule);
+  border:1px solid var(--rule);border-radius:3px;margin-top:16px;overflow:hidden}
+.cell{background:#fff;padding:11px 13px}
+.cell .k{font-size:11.5px;color:var(--ink-2);display:block}
+.cell .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:21px;font-weight:600;line-height:1.3}
+.cell .s{font-size:11px;color:var(--ink-2);display:block}
+.cell.warn .v{color:var(--shu)}
+.cell.warn .s b{color:var(--shu)}
+.verdict{background:#fff;border:1px solid var(--rule);border-left:4px solid var(--take);border-radius:3px;padding:14px 16px;margin-top:18px}
+.verdict.no{border-left-color:var(--shu)}
+.verdict h3{font-family:var(--mincho);font-size:16px;margin:0 0 6px;color:var(--take)}
+.verdict.no h3{color:var(--shu)}
+.verdict p{margin:0 0 8px;font-size:13.5px}
+.verdict p:last-child{margin-bottom:0}
+.verdict ul{margin:8px 0 0;padding-left:1.1em;font-size:13.5px}
+b.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+table{width:100%;min-width:780px;border-collapse:collapse;font-size:13px}
+th,td{padding:6px 5px;border-bottom:1px solid var(--rule);text-align:right;vertical-align:middle}
+th{font-size:11px;font-weight:500;color:var(--ink-2);letter-spacing:.04em;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td.calc{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td.std{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ai);white-space:nowrap}
+tfoot td{font-weight:600;border-bottom:0;border-top:2px solid var(--ink)}
+table input{padding:5px 4px;font-size:13px;min-width:0}
+table input[type=number]{-moz-appearance:textfield}
+table input[type=number]::-webkit-outer-spin-button,
+table input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.tbl-scroll{overflow-x:auto;margin:0 -4px}
+.rolename{display:block}
+.rolenote{display:block;font-size:10.5px;color:var(--ink-2);line-height:1.45;margin-top:1px}
+.addrow,.ghost{margin-top:10px;background:#fff;border:1px solid var(--rule);border-radius:2px;padding:6px 12px;
+  font-size:12.5px;cursor:pointer;font-family:var(--gothic);color:var(--ink)}
+.addrow:hover,.ghost:hover{background:var(--paper)}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.del{border:0;background:none;color:var(--ink-2);cursor:pointer;font-size:15px;line-height:1;padding:2px 5px}
+.del:hover{color:var(--shu)}
+.scaler{margin-top:16px;border-top:1px solid var(--rule);padding-top:14px}
+input[type=range]{width:100%;accent-color:var(--kohaku)}
+.caveat{margin-top:26px;border:1px dashed var(--rule);border-radius:3px;padding:14px 16px;font-size:12.5px;color:var(--ink-2)}
+.caveat h3{font-family:var(--mono);font-size:11px;letter-spacing:.14em;margin:0 0 7px;color:var(--ink-2)}
+.caveat h4{font-family:var(--gothic);font-size:12.5px;margin:12px 0 4px;color:var(--ink)}
+.caveat ul{margin:0;padding-left:1.1em}
+.caveat li{margin-bottom:3px}
+.copybox{width:100%;min-height:120px;font-family:var(--mono);font-size:12px;padding:10px;border:1px solid var(--rule);
+  border-radius:2px;margin-top:10px;line-height:1.6;background:#fff;color:var(--ink)}
+@media print{body{background:#fff}.panel,.chartbox{border-color:#999}.ghost,.addrow,.del{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <div class="eyebrow">SWMD / Personnel Cost Trade-off　v0.3</div>
+  <h1>人件費トレードオフ・シミュレーター</h1>
+  <p class="lede">人件費の原資が決まると、職員数と賃金水準は同時には決められません。「基準どおりの配置」と「払える賃金」がどこでぶつかるのかを、サービス種別の配置基準と突き合わせて確かめます。</p>
+</header>
+
+<div class="cols">
+  <!-- ============ 左 ============ -->
+  <div>
+    <section class="panel">
+      <h2>事業を選ぶ<span class="tag">STEP 1</span></h2>
+      <div class="field">
+        <label for="svc">サービス種別</label>
+        <select id="svc"></select>
+      </div>
+      <div id="scale-fields"></div>
+      <p class="hint" id="svc-note"></p>
+    </section>
+
+    <section class="panel">
+      <h2>原資を決める<span class="tag">STEP 2</span></h2>
+      <div class="seg" role="group" aria-label="原資の決め方">
+        <button id="mode-ratio" aria-pressed="true">収益 × 人件費率</button>
+        <button id="mode-direct" aria-pressed="false">人件費総額を直接</button>
+      </div>
+      <div id="ratio-fields">
+        <label class="chk"><input type="checkbox" id="auto-rev" checked> STEP1の規模から収益を概算する</label>
+        <div class="field" id="price-field">
+          <label for="price" id="price-label">1人1日あたり収入</label>
+          <div class="inline"><input type="number" id="price" value="13200" step="100" min="0"><span class="unit">円</span></div>
+          <p class="hint" id="price-hint"></p>
+        </div>
+        <div class="field">
+          <label for="rev">年間サービス活動収益</label>
+          <div class="inline"><input type="number" id="rev" value="37000" step="100" min="0"><span class="unit">万円</span></div>
+        </div>
+        <div class="field">
+          <label for="ratio">人件費率（給与費 ÷ 収入）</label>
+          <div class="inline"><input type="number" id="ratio" value="64.3" step="0.1" min="0" max="100"><span class="unit">％</span></div>
+          <p class="hint" id="bench"></p>
+        </div>
+      </div>
+      <div id="direct-fields" hidden>
+        <div class="field">
+          <label for="total">年間人件費総額（法定福利費込み）</label>
+          <div class="inline"><input type="number" id="total" value="23791" step="100" min="0"><span class="unit">万円</span></div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="fuku">法定福利費・退職共済等の事業主負担率</label>
+        <div class="inline"><input type="number" id="fuku" value="16.5" step="0.1" min="0"><span class="unit">％</span></div>
+      </div>
+      <div class="field">
+        <label for="bonus">賞与月数（月例給の換算用）</label>
+        <div class="inline"><input type="number" id="bonus" value="4.0" step="0.1" min="0"><span class="unit">ヶ月</span></div>
+      </div>
+      <div class="readout">
+        <div class="row"><span class="k">人件費総額</span><span class="v" id="o-total">–</span></div>
+        <div class="row lead"><span class="k">給与原資（賞与含む）</span><span class="v" id="o-wagepool">–</span></div>
+        <div class="row"><span class="k">実質人件費率</span><span class="v" id="o-ratio">–</span></div>
+      </div>
+    </section>
+
+    <section class="panel" id="emp-panel">
+      <h2>雇用区分<span class="tag">STEP 4</span></h2>
+      <div class="field">
+        <label for="hi-w">非正規の賃金水準（正規を100として）</label>
+        <div class="inline"><input type="number" id="hi-w" value="70" step="1" min="0" max="200"><span class="unit">％</span></div>
+        <p class="hint">同じ常勤換算1人あたりで比べた年収の比です。手当と賞与の差をまとめてここで表します。</p>
+      </div>
+      <p class="hint">人数は STEP5 の表で、職種ごとに正規・非正規の常勤換算をそのまま入れてください。割合はここに出ます。</p>
+      <div class="readout" id="emp-readout"></div>
+    </section>
+
+    <section class="panel">
+      <h2>譲れない線を引く<span class="tag">STEP 3</span></h2>
+      <div class="field">
+        <label for="nmin">配置の下限（常勤換算・合計）</label>
+        <div class="inline"><input type="number" id="nmin" value="31" step="0.1" min="0"><span class="unit">人</span></div>
+        <p class="hint" id="nmin-note"></p>
+        <div class="btnrow"><button class="ghost" id="use-std">基準を満たす最小に戻す</button></div>
+      </div>
+      <div class="field">
+        <label for="atgt">下回れない平均年収</label>
+        <div class="inline"><input type="number" id="atgt" value="400" step="5" min="0"><span class="unit">万円</span></div>
+        <p class="hint">地域相場、または現在の平均年収を入れます。ここを下げれば人は増やせます。</p>
+      </div>
+      <div class="field">
+        <label for="week">常勤の週所定労働時間（常勤換算の分母）</label>
+        <div class="inline"><input type="number" id="week" value="40" step="0.5" min="1"><span class="unit">時間</span></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ 右 ============ -->
+  <div>
+    <section class="chartbox">
+      <h2>等原資曲線</h2>
+      <p class="chartnote">曲線上のどの点も、人件費の支出は同額です。琥珀色の点を左右にドラッグすると、人数と賃金が反対向きに動きます。</p>
+      <svg id="chart" viewBox="0 0 640 400" role="img" aria-label="職員数と平均年収のトレードオフ曲線"></svg>
+      <div class="legend">
+        <span><i style="border-color:var(--take)"></i>両方の線を満たす区間</span>
+        <span><i style="border-color:var(--ai);border-top-style:dashed"></i>譲れない線</span>
+        <span><i style="border-color:var(--shu);border-top-style:dashed"></i>職種別基準を満たす最小合計</span>
+        <span><i style="border-color:var(--kohaku)"></i>いまの置き方</span>
+      </div>
+      <div class="scaler">
+        <label for="scale">職員数（常勤換算・合計）　<b class="num" id="o-n">–</b> 人</label>
+        <input type="range" id="scale" min="0.4" max="1.8" step="0.005" value="1">
+      </div>
+      <div class="ratiobar" id="ratiobar"></div>
+    </section>
+
+    <div id="compliance" class="verdict"></div>
+    <div id="verdict" class="verdict"></div>
+
+    <section class="panel">
+      <h2>いま動かすと何が起きるか<span class="tag">限界トレードオフ</span></h2>
+      <div id="marginal"></div>
+    </section>
+
+    <section class="panel">
+      <h2>職種別の内訳<span class="tag">STEP 5</span></h2>
+      <p class="hint" style="margin:-6px 0 10px"><b>正規・非正規は、それぞれの常勤換算をそのまま入れてください</b>（内数ではありません）。合計が「基準」以上かどうかで充足を判定します。初期値は正規に基準どおりの人数、非正規は0人です。基準のない職種（事務・調理など）は0人から始まります。加算要件・自治体条例・兼務の扱いで必要数は変わります。<br><b>「基準年収」と「配分後年収」の違い：</b>基準年収は<b>職種間の相対比を決める入力</b>で、水準そのものではありません。給与原資をこの比で按分した結果が配分後年収です。両者の比が「賃金倍率」で、原資が構成に対して厚ければ1を超え、不足すれば1を下回ります。<b>法定福利費とは無関係です。</b>実額どおりに揃えたいときは下の「入力した基準年収どおりにする」を押してください。<br>
+      <b>雇用区分：</b>非正規の年収は STEP4 の賃金水準（既定70％）を掛けた値です。同じ原資でも比率を変えれば、置ける人数か正規の賃金のどちらかが動きます。<br>
+      <b>金額の基準：</b>年収・月例給は<b>額面</b>で、事業主負担の法定福利費は含みません。賃金センサスや求人票の提示年収と同じ土俵の数字です。</p>
+      <div class="tbl-scroll">
+      <table id="tbl">
+        <thead>
+          <tr>
+            <th style="min-width:10em">職種</th>
+            <th style="width:4.4em">基準<br>常勤換算</th>
+            <th style="width:5em">正規<br>常勤換算</th>
+            <th style="width:5.4em">非正規<br>常勤換算</th>
+            <th style="width:6.2em">基準年収<br>万円（比の元）</th>
+            <th style="width:5em">合計<br>常勤換算</th>
+            <th style="width:6em">正規年収<br>万円</th>
+            <th style="width:6.4em">非正規年収<br>万円</th>
+            <th style="width:2em"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+        <tfoot>
+          <tr>
+            <td>合計</td>
+            <td class="std" id="f-std">–</td>
+            <td class="calc" id="f-nbase">–</td>
+            <td class="calc" id="f-hi">–</td>
+            <td></td>
+            <td class="calc" id="f-n">–</td>
+            <td class="calc" id="f-a">–</td>
+            <td class="calc" id="f-e">–</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+      </div>
+      <div class="btnrow">
+        <button class="addrow" id="add">＋ 職種を追加</button>
+        <button class="ghost" id="reset-roles">規模に合わせて置き直す</button>
+        <button class="ghost" id="fill-std">不足職種を基準まで埋める</button>
+        <button class="ghost" id="fit-wage">入力した基準年収どおりにする</button>
+      </div>
+      <p class="hint">「規模に合わせて置き直す」＝定員や稼働率に比例して実配置を引き直します（手入力した値は消えます）。<br>「入力した基準年収どおりにする」＝賃金倍率が1.000になるよう人件費率（または人件費総額）を逆算します。実際の給与表を入れて<b>必要な人件費率</b>を知りたいときに使います。</p>
+    </section>
+
+    <section class="panel">
+      <h2>この条件を書き出す<span class="tag">相談用</span></h2>
+      <button class="ghost" id="mk">条件と結果をテキストにする</button>
+      <textarea class="copybox" id="out" readonly hidden></textarea>
+    </section>
+
+    <div class="caveat">
+      <h3>前提と出典の扱い</h3>
+      <h4>処遇改善加算について</h4>
+      <ul>
+        <li>この画面の収益・人件費は<b>決算書ベース</b>です。処遇改善加算による収入も、加算を原資とした賃金改善も、どちらも含んだままにしています。決算書からは両者を厳密に切り分けられないため、あえて分離していません。</li>
+        <li>したがって表示される人件費率は「加算込みの給与費割合」であり、介護事業経営概況調査の給与費割合と同じ土俵の数字です。</li>
+        <li>一方で、加算相当分は<b>賃金への充当義務がある収入</b>です。給与原資のうち一定額は配分の自由度がありません。制度設計の議論では、加算実績額を別途拾って「自由に配分できる原資」を確認する必要があります。</li>
+      </ul>
+      <h4>規模と収益の連動</h4>
+      <ul>
+        <li>「STEP1の規模から収益を概算する」を入れている間は、<b>年間収益＝利用者数×単価×年間稼働日数</b>で自動計算します。定員や稼働率を動かせば収益も動くので、規模と原資の整合が取れます。</li>
+        <li>チェックを外すと収益は手入力になります。決算書の実額を入れる場合はこちらです。<b>ただし手入力のまま定員だけを変えると、規模と収益が食い違ったまま曲線が描かれます。</b></li>
+        <li>単価の初期値は各サービスの平均的な規模から逆算した値で、<b>未検証のサンプル</b>です。地域区分・要介護度構成・加算・通所介護の規模区分で大きく変わります。</li>
+      </ul>
+      <h4>合計人数では基準充足を判定できません</h4>
+      <ul>
+        <li>3:1などの配置基準は<b>職種別の要件</b>です。事務や調理を厚くすれば合計人数を満たしたまま介護・看護が基準を割るため、合計の下限だけでは判定できません。このツールは職種別に充足を判定し、不足があれば判定欄に表示します。</li>
+        <li>「配置の下限」の自動値は、いまの職種構成のまま人数を増減させたときに<b>全職種が基準を満たす最小の合計</b>です。構成に偏りがあるほど、基準の単純合計より大きくなります。</li>
+        <li>定員や稼働率を変えたあとに職種構成を置き直していないと、この2つの数字は開きます。「規模に合わせて置き直す」か「不足職種を基準まで埋める」で構成側を直してください。</li>
+      </ul>
+      <h4>配置基準の自動計算</h4>
+      <ul>
+        <li>主要職種の一般的な基準を要約したものです。<b>加算要件、自治体の上乗せ条例、兼務・みなし配置、経過措置は反映していません。</b>実際の必要員数は指定権者への確認が必要です。</li>
+        <li>基準は「常勤換算の平均値」で満たせばよい規定です。24時間つねにその比率で人がいることを意味しません。夜勤体制、有給取得、産休・育休、欠員リスクを織り込むと、実務上の必要数は基準を上回ります。<b>そのギャップこそがこのツールで見たい部分です。</b></li>
+      </ul>
+      <h4>実配置の初期値と雇用区分</h4>
+      <ul>
+        <li>実配置の初期値は<b>運営基準どおりの人数</b>を入れています。3:1などの基準を満たす最小構成で、休憩・夜勤・有給・欠員は織り込んでいません。実際に何人置くかは施設の配置の考え方によるため、そこから先は入力していただく設計です。</li>
+        <li>基準のない職種（事務職員・調理員など）は0人から始まります。給食委託であれば調理員は0のままで構いませんが、事務職員は実数を入れないと賃金水準が実態より高く出ます。</li>
+        <li>正規・非正規は内数ではなく、それぞれの常勤換算を直接入れます。配置基準の充足は雇用形態を問わず合計で判定します。</li>
+        <li>非正規の賃金水準70％は<b>未検証の初期値</b>です。手当と賞与の差をこの1つの比率にまとめているため、賞与月数は正規と共通で計算しています。非正規の月例給は実態より低めに出ます。</li>
+        <li>非正規の事業主負担率は<b>正規と同率として計算しています。</b>社会保険の加入対象外の短時間勤務が多い場合、実際の負担は雇用保険・労災だけになり大きく下がります。その差はこのツールでは反映していません。</li>
+        <li>このツールは非正規比率を「原資を増やさずに人数を増やす手段」として扱いますが、定着率・育成コスト・サービスの質は計算していません。比率の判断材料としては不足しています。</li>
+      </ul>
+      <h4>「基準年収」は水準ではなく比率です</h4>
+      <ul>
+        <li>職種別の年収は、給与原資を「実配置 × 基準年収」の比で按分して決めています。つまり<b>基準年収は職種間の格差を指定する入力</b>で、金額そのものは賃金倍率で上書きされます。</li>
+        <li>賃金倍率は<b>法定福利費とは無関係</b>です。原資はすでに事業主負担を割り戻したあとの額で按分しています。倍率が1.16前後になることがありますが、法定福利費率との一致は偶然です。</li>
+        <li>実際の給与表どおりの金額で見たいときは「入力した基準年収どおりにする」を押します。賃金倍率が1.000になり、そのとき必要な人件費率が逆算されます。<b>この逆算値と現在の人件費率の差が、賃金制度を維持できるかどうかの答えです。</b></li>
+      </ul>
+      <h4>金額がどの範囲を指しているか</h4>
+      <ul>
+        <li>「人件費総額」は決算書の給与費と同じ範囲で、<b>事業主負担の法定福利費を含みます</b>。そこから事業主負担率で割り戻したものが「給与原資」で、職種別の年収・月例給はすべてこの額面ベースです。</li>
+        <li>既定の16.5％は健康保険・厚生年金・雇用保険・労災の<b>事業主負担分のおおよその合計</b>です。<b>退職共済掛金や退職給付引当は含んでいません。</b>決算書の人件費から逆算すると18〜19％程度になることが多く、その場合は実額に置き換えてください（この数値も未検証）。</li>
+        <li>決算書の人件費には<b>役員報酬・退職給付費用・通勤手当</b>も入っています。職種表にこれらの行がないと、その分が既存職種の年収に上乗せされ、賃金水準が実態より高く出ます。金額が大きい場合は行を追加してください。</li>
+        <li>「月例給」は年収を（12＋賞与月数）で割った単純な換算値です。実際の月例給には夜勤手当・時間外・通勤手当が含まれるため、求人票の基本給とは一致しません。</li>
+      </ul>
+      <h4>数値の検証状況</h4>
+      <ul>
+        <li>人件費率の参考値は、厚生労働省「令和7年度介護事業経営概況調査」（令和6年度決算）の収入に対する給与費割合のうち<b>全サービス平均64.3％</b>です。<b>収載している4サービスについては、サービス別の実数を未取得のため全サービス平均を暫定適用しています。</b></li>
+        <li>職種別の基準年収、法定福利費率16.5％、賞与月数はいずれも<b>説明用のサンプル値（未検証）</b>です。実データでの較正は行っていません。自法人の実額に置き換えてお使いください。</li>
+        <li>賃金は年収ベースで、退職給付引当・通勤費・派遣委託費・人材紹介手数料は含めていません。</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+/* ===== SWMD-ENGINE:BEGIN =====
+   DOMに触れない純粋な計算層。tools/extract-engine.mjs がこの区間だけを
+   engine.mjs として抜き出し、tests/ から import して検証する。
+   この区間に document / window / $ / num を書かないこと。
+   ===== */
+var ENGINE = (function(){
+  "use strict";
+
+var W = {
+  chief:600, jimu:340, soudan:400, kaigo:370, kango:460, kinou:440,
+  eiyou:390, chouri:300, cm:430, ishi:1800, pt:450, yakuzai:600
+};
+var CEIL = function(v){ return Math.ceil(v - 1e-9); };
+
+/* =========================================================
+   サービス種別プリセット
+   scaleFields: 規模入力の定義
+   build(s): 職種行を返す [{key,name,std,note,a}]
+   ratio: 実配置比率の定義（不要なら null）
+   ========================================================= */
+var SERVICES = {
+
+  tokuyou: {
+    name:"介護老人福祉施設（従来型）", defRev:37000,
+    priceBasis:"day", unitPrice:13200, priceLabel:"入所者1人1日あたり収入", annualDays:function(s){ return 365; },
+    bench:64.3, benchNote:"全サービス平均を暫定適用（サービス別実数は未取得）",
+    note:"入所者3人に対し介護・看護職員1人以上（常勤換算）。看護職員は入所者数に応じた段階配置。",
+    fields:[{k:"cap",label:"入所定員",unit:"人",val:80,step:1},
+            {k:"occ",label:"稼働率",unit:"％",val:96,step:1}],
+    users:function(s){ return s.cap * s.occ / 100; },
+    build:function(s){
+      var u = this.users(s);
+      var kango = u < 30 ? 1 : u < 50 ? 2 : u <= 130 ? 3 : 3 + CEIL((u - 130) / 50);
+      var core = u / 3, r = u / 80;
+      return [
+        {key:"chief", name:"施設長",             std:1,               a:W.chief,  note:"常勤専従1"},
+        {key:"ishi",  name:"医師（嘱託）",        std:0.1,           a:W.ishi,   note:"必要数・非常勤可"},
+        {key:"soudan",name:"生活相談員",          std:Math.max(1,CEIL(u/100)), a:W.soudan, note:"入所者100人に1以上"},
+        {key:"kango", name:"看護職員",            std:kango,          a:W.kango,  note:"30未満1／30以上50未満2／50以上130以下3／130超は50ごとに+1"},
+        {key:"kaigo", name:"介護職員",            std:Math.max(0,core-kango), a:W.kaigo, note:"介護＋看護で入所者3人に1（3:1）"},
+        {key:"kinou", name:"機能訓練指導員",      std:1,               a:W.kinou,  note:"1以上・兼務可"},
+        {key:"cm",    name:"介護支援専門員",      std:Math.max(1,CEIL(u/100)), a:W.cm,  note:"1以上（100:1を標準）・兼務可"},
+        {key:"eiyou", name:"管理栄養士・栄養士",  std:1,               a:W.eiyou,  note:"1以上"},
+        {key:"chouri",name:"調理員・その他",      std:0,             a:W.chouri, note:"基準なし。給食委託なら0"},
+        {key:"jimu",  name:"事務職員",            std:0,             a:W.jimu,   note:"基準なし"}
+      ];
+    },
+    ratio:{ label:"介護・看護職員 対 入所者", roles:["kaigo","kango"], std:3 }
+  },
+
+  unit: {
+    name:"介護老人福祉施設（ユニット型）", defRev:37000,
+    priceBasis:"day", unitPrice:13200, priceLabel:"入所者1人1日あたり収入", annualDays:function(s){ return 365; },
+    bench:64.3, benchNote:"全サービス平均を暫定適用（サービス別実数は未取得）",
+    note:"3:1に加え、日中は1ユニットに常時1人以上、夜間は2ユニットに1人以上。ユニット常時配置のほうが3:1より重くなる場合があります。",
+    fields:[{k:"cap",label:"入所定員",unit:"人",val:80,step:1},
+            {k:"occ",label:"稼働率",unit:"％",val:96,step:1},
+            {k:"units",label:"ユニット数",unit:"", val:8,step:1}],
+    users:function(s){ return s.cap * s.occ / 100; },
+    build:function(s){
+      var u = this.users(s);
+      var kango = u < 30 ? 1 : u < 50 ? 2 : u <= 130 ? 3 : 3 + CEIL((u - 130) / 50);
+      var core = u / 3, r = u / 80;
+      // 日中16時間×常時1人／ユニット ＋ 夜間8時間×1人／2ユニット を週7日回す常勤換算
+      var byUnit = (s.units || 1) * (16 + 8/2) * 7 / (s.week || 40);
+      return [
+        {key:"chief", name:"施設長",            std:1, a:W.chief, note:"常勤専従1"},
+        {key:"ishi",  name:"医師（嘱託）",       std:0.1, a:W.ishi, note:"必要数・非常勤可"},
+        {key:"soudan",name:"生活相談員",         std:Math.max(1,CEIL(u/100)), a:W.soudan, note:"入所者100人に1以上"},
+        {key:"kango", name:"看護職員",           std:kango, a:W.kango, note:"段階配置"},
+        {key:"kaigo", name:"介護職員",           std:Math.max(0, Math.max(core, byUnit) - kango), a:W.kaigo,
+                      note:"3:1と、ユニット常時配置に要する数の大きい方。後者は日中16h×1人／U＋夜間8h×1人／2Uを週7日で換算した目安（未検証）"},
+        {key:"kinou", name:"機能訓練指導員",     std:1, a:W.kinou, note:"1以上・兼務可"},
+        {key:"cm",    name:"介護支援専門員",     std:Math.max(1,CEIL(u/100)), a:W.cm, note:"1以上・兼務可"},
+        {key:"eiyou", name:"管理栄養士・栄養士", std:1, a:W.eiyou, note:"1以上"},
+        {key:"chouri",name:"調理員・その他",     std:0, a:W.chouri, note:"基準なし。給食委託なら0"},
+        {key:"jimu",  name:"事務職員",           std:0, a:W.jimu, note:"基準なし"}
+      ];
+    },
+    ratio:{ label:"介護・看護職員 対 入所者", roles:["kaigo","kango"], std:3 }
+  },
+
+  roken: {
+    name:"介護老人保健施設", defRev:48000,
+    priceBasis:"day", unitPrice:14300, priceLabel:"入所者1人1日あたり収入", annualDays:function(s){ return 365; },
+    bench:64.3, benchNote:"全サービス平均を暫定適用（サービス別実数は未取得）",
+    note:"看護・介護で3:1、うち看護2/7・介護5/7が標準。医師は入所者100人に1人以上（常勤1以上）。",
+    fields:[{k:"cap",label:"入所定員",unit:"人",val:100,step:1},
+            {k:"occ",label:"稼働率",unit:"％",val:92,step:1}],
+    users:function(s){ return s.cap * s.occ / 100; },
+    build:function(s){
+      var u = this.users(s), core = u / 3, r = u / 92;
+      return [
+        {key:"chief", name:"管理者（施設長）",   std:1, a:W.chief, note:"常勤1"},
+        {key:"ishi",  name:"医師",               std:Math.max(1,u/100), a:W.ishi, note:"入所者100人に1以上・常勤1以上"},
+        {key:"kango", name:"看護職員",           std:core*2/7, a:W.kango, note:"看護・介護3:1のうち看護2/7が標準"},
+        {key:"kaigo", name:"介護職員",           std:core*5/7, a:W.kaigo, note:"同うち介護5/7が標準"},
+        {key:"soudan",name:"支援相談員",         std:Math.max(1,CEIL(u/100)), a:W.soudan, note:"1以上（100:1）"},
+        {key:"pt",    name:"PT・OT・ST",         std:Math.max(1,u/100), a:W.pt, note:"入所者100人に1以上"},
+        {key:"cm",    name:"介護支援専門員",     std:Math.max(1,CEIL(u/100)), a:W.cm, note:"1以上（100:1）"},
+        {key:"eiyou", name:"管理栄養士・栄養士", std:u>=100?1:0, a:W.eiyou, note:"入所定員100以上で1以上"},
+        {key:"yakuzai",name:"薬剤師",            std:0.2, a:W.yakuzai, note:"実情に応じた適当数"},
+        {key:"chouri",name:"調理員・その他",     std:0, a:W.chouri, note:"基準なし。給食委託なら0"},
+        {key:"jimu",  name:"事務職員",           std:0, a:W.jimu, note:"基準なし"}
+      ];
+    },
+    ratio:{ label:"看護・介護職員 対 入所者", roles:["kaigo","kango"], std:3 }
+  },
+
+  tsuusho: {
+    name:"通所介護", defRev:7700,
+    priceBasis:"day", unitPrice:8010, priceLabel:"利用者1人1日あたり収入", annualDays:function(s){ return (s.days || 6) * 52; },
+    bench:64.3, benchNote:"全サービス平均を暫定適用（サービス別実数は未取得）",
+    note:"介護職員は利用者15人まで1以上、15人を超える部分は5人ごとに1を加えた数を、提供時間帯を通じて配置。常勤換算への換算は営業日数と提供時間に左右されます。",
+    fields:[{k:"cap",label:"1日あたり利用定員",unit:"人",val:35,step:1},
+            {k:"occ",label:"稼働率",unit:"％",val:88,step:1},
+            {k:"hours",label:"1日のサービス提供時間",unit:"時間",val:7,step:0.5},
+            {k:"days",label:"週の営業日数",unit:"日",val:6,step:1}],
+    users:function(s){ return s.cap * s.occ / 100; },
+    build:function(s){
+      var u = this.users(s), r = u / 30.8;
+      var need = u <= 15 ? 1 : 1 + (u - 15) / 5;
+      var f = (s.hours * s.days) / (s.week || 40);
+      return [
+        {key:"chief", name:"管理者",           std:1, a:W.chief, note:"常勤専従1（兼務可）"},
+        {key:"soudan",name:"生活相談員",       std:f, a:W.soudan, note:"提供時間帯を通じて専従1以上"},
+        {key:"kaigo", name:"介護職員",         std:need*f, a:W.kaigo,
+                      note:"15人まで1、超過分5人ごとに+1を提供時間帯を通じて。常勤換算＝必要員数×(提供時間×営業日数)÷週所定労働時間"},
+        {key:"kango", name:"看護職員",         std:f, a:W.kango, note:"1以上（定員10人以下は不要・兼務や緩和の規定あり）"},
+        {key:"kinou", name:"機能訓練指導員",   std:0.5, a:W.kinou, note:"1以上・兼務可（目安値）"},
+        {key:"unten", name:"送迎・調理・事務", std:0, a:W.jimu, note:"基準なし"}
+      ];
+    },
+    ratio:{ label:"介護・看護職員 対 利用者（常勤換算）", roles:["kaigo","kango"], std:null }
+  }
+
+};
+  /* ---------- 純粋な計算 ---------- */
+  function annualMult(svc, sizes, week){
+    if (svc.priceBasis !== "day") return 12;
+    var s = {}; for (var k in sizes) s[k] = sizes[k];
+    s.week = week;
+    return svc.annualDays(s);
+  }
+
+  function buildStandard(svcKey, sizes, week){
+    var s = {}; for (var k in sizes) s[k] = sizes[k];
+    s.week = week;
+    return SERVICES[svcKey].build(s);
+  }
+
+  /* 入力 I（DOM非依存）から、画面に出す全数値を計算して返す。
+     I = { service, sizes, week, mode, autoRev, price, rev, ratio, total,
+           fuku, bonus, hiW, scale, nminAuto, nminManual, atgt,
+           rows:[{key,name,note,n,hi,a}] }                            */
+  function calcState(I){
+    var svc = SERVICES[I.service];
+    var sz = {}; for (var q in I.sizes) sz[q] = I.sizes[q];
+    sz.week = I.week;
+
+    var users = svc.users(sz);
+    var stdRows = svc.build(sz);
+    var stdMap = {}, noteMap = {};
+    stdRows.forEach(function(r){ stdMap[r.key] = r.std; noteMap[r.key] = r.note; });
+
+    var scale = I.scale, hw = I.hiW / 100;
+    var rows = I.rows.map(function(r){
+      return {
+        key:r.key, name:r.name,
+        note: (noteMap[r.key] != null ? noteMap[r.key] : r.note),
+        std:  (stdMap[r.key]  != null ? stdMap[r.key]  : null),
+        n:  Math.max(0, r.n  || 0),
+        hi: Math.max(0, r.hi || 0),
+        a:  Math.max(0, r.a  || 0)
+      };
+    });
+
+    /* 原資 */
+    var rev = (I.autoRev && I.mode === "ratio")
+      ? users * I.price * annualMult(svc, I.sizes, I.week) / 10000
+      : I.rev;
+    var total = (I.mode === "ratio") ? rev * I.ratio / 100 : I.total;
+    var pool  = total / (1 + I.fuku / 100);
+
+    /* 人数と賃金 */
+    var baseS = 0, baseH = 0, stdN = 0, Bs = 0, Bh = 0;
+    rows.forEach(function(r){
+      baseS += r.n; baseH += r.hi; stdN += (r.std || 0);
+      Bs += r.n * r.a; Bh += r.hi * r.a * hw;
+    });
+    var baseN = baseS + baseH, baseW = Bs + Bh;
+    var k    = baseW > 0 ? pool / (baseW * scale) : 0;
+    var n    = baseN * scale, nSe = baseS * scale, nHi = baseH * scale;
+    var avg   = n   > 0 ? pool / n : 0;
+    var avgSe = nSe > 0 ? k * Bs * scale / nSe : 0;
+    var avgHi = nHi > 0 ? k * Bh * scale / nHi : 0;
+
+    rows.forEach(function(r){
+      r.totalFte  = (r.n + r.hi) * scale;
+      r.salarySe  = r.a * k;
+      r.salaryHi  = r.a * hw * k;
+      r.monthlySe = r.salarySe * 10000 / (12 + I.bonus);
+    });
+
+    /* 職種別の基準充足 */
+    var sMin = 0, blocked = null, shorts = [];
+    rows.forEach(function(r){
+      if (!r.std || r.std <= 0) return;
+      if (r.totalFte < r.std - 1e-9) shorts.push({ name:r.name, gap:r.std - r.totalFte });
+      var tot = r.n + r.hi;
+      if (tot <= 0){ blocked = r.name; return; }
+      var need = r.std / tot;
+      if (need > sMin) sMin = need;
+    });
+    var nMinComp = blocked ? Infinity : baseN * sMin;
+    var nmin = I.nminAuto
+      ? (isFinite(nMinComp) ? Math.ceil(nMinComp * 10) / 10 : stdN)
+      : I.nminManual;
+
+    /* 配置比率（雇用形態を問わず合計で数える） */
+    var coreN = 0;
+    if (svc.ratio) rows.forEach(function(r){
+      if (svc.ratio.roles.indexOf(r.key) >= 0) coreN += r.totalFte;
+    });
+    var ratioActual = (coreN > 0 && users > 0)
+      ? (svc.ratio && svc.ratio.invert ? users / coreN : users / coreN) : 0;
+    var ratioBad = !!(svc.ratio && svc.ratio.std && !svc.ratio.invert
+                      && coreN > 0 && ratioActual > svc.ratio.std + 1e-9);
+
+    /* 成立判定 */
+    var nCap      = I.atgt > 0 ? pool / I.atgt : Infinity;
+    var feasible  = nmin <= nCap + 1e-9;
+    var needPool  = nmin * I.atgt;
+    var needTotal = needPool * (1 + I.fuku / 100);
+    var effRatio  = rev > 0 ? total / rev * 100 : 0;
+
+    /* 限界トレードオフ */
+    var up = 10, f1 = 1 + I.fuku / 100;
+    var needMoreTotal = n * up * f1;
+    var hiNow = n > 0 ? nHi / n : 0, hiNew = Math.min(1, hiNow + 0.10);
+    var Cnow = (1 - hiNow) * f1 + hiNow * hw * f1;
+    var Cnew = (1 - hiNew) * f1 + hiNew * hw * f1;
+    var abar  = baseN > 0 ? (Bs + (hw ? Bh / hw : 0)) / baseN : 0;
+    var dB    = (hiNew - hiNow) * baseN * abar;
+    var Bs2 = Bs - dB, Bh2 = Bh + dB * hw;
+    var pool2 = total / f1;
+    var k2 = (Bs2 + Bh2) > 0 ? pool2 / ((Bs2 + Bh2) * scale) : 0;
+    var nSe2 = n * (1 - hiNew);
+    var marg = {
+      perPerson: n > 0 ? pool / n - pool / (n + 1) : 0,
+      needMoreTotal: needMoreTotal,
+      cutN: (avg + up) > 0 ? n - pool / (avg + up) : 0,
+      ptUp: rev > 0 ? needMoreTotal / rev * 100 : 0,
+      revUp: I.ratio > 0 ? needMoreTotal / (I.ratio / 100) : 0,
+      hiNow: hiNow * 100, hiNew: hiNew * 100,
+      dN: Cnew > 0 ? n * (Cnow / Cnew - 1) : 0,
+      dAvgSe: nSe2 > 0 ? (k2 * Bs2 * scale / nSe2) - avgSe : 0
+    };
+
+    return {
+      service:I.service, svcName:svc.name, svc:svc, sizes:I.sizes, week:I.week,
+      mode:I.mode, autoRev:I.autoRev, price:I.price, scale:scale,
+      fuku:I.fuku, bonus:I.bonus, hw:hw, ratioIn:I.ratio, atgt:I.atgt,
+      rev:rev, total:total, pool:pool, effRatio:effRatio, k:k,
+      rows:rows, baseS:baseS, baseH:baseH, baseN:baseN, stdN:stdN,
+      n:n, nSe:nSe, nHi:nHi, hiRate: n > 0 ? nHi / n * 100 : 0,
+      avg:avg, avgSe:avgSe, avgHi:avgHi, perHead: avg * (1 + I.fuku / 100),
+      sMin:sMin, nMinComp:nMinComp, shorts:shorts, blocked:blocked, nmin:nmin,
+      users:users, coreN:coreN, ratioActual:ratioActual, ratioBad:ratioBad,
+      nCap:nCap, feasible:feasible,
+      okN: n >= nmin - 1e-9, okA: avg >= I.atgt - 1e-9,
+      needPool:needPool, needTotal:needTotal, gap: needTotal - total,
+      needRatio: rev > 0 ? needTotal / rev * 100 : 0,
+      needRev: I.ratio > 0 ? needTotal / (I.ratio / 100) : 0,
+      marg:marg
+    };
+  }
+
+  /* 初期行（実配置＝基準、非正規0） */
+  function initialRows(svcKey, sizes, week){
+    return buildStandard(svcKey, sizes, week).map(function(r){
+      return { key:r.key, name:r.name, note:r.note,
+               n: Math.round((r.std || 0) * 10) / 10, hi:0, a:r.a };
+    });
+  }
+
+  return { W:W, SERVICES:SERVICES, buildStandard:buildStandard,
+           calcState:calcState, initialRows:initialRows, annualMult:annualMult };
+})();
+/* ===== SWMD-ENGINE:END ===== */
+
+
+/* ===== SWMD-UI:BEGIN =====
+   DOM層。入力を集めて ENGINE.calcState に渡し、返り値だけを描画する。
+   計算式をこの層に書かないこと（書いたらテストの網から外れる）。
+   ===== */
+(function(){
+"use strict";
+
+var S = ENGINE.SERVICES;
+var svcKey = "tokuyou", mode = "ratio", autoRev = true, nminTouched = false;
+var scale = 1, sizes = {}, rows = [];
+
+var $ = function(id){ return document.getElementById(id); };
+var num = function(id){ var v = parseFloat($(id).value); return isFinite(v) ? v : 0; };
+function man(v){ return v.toLocaleString("ja-JP",{maximumFractionDigits:0}) + " 万円"; }
+function n1(v){ return (Math.round(v*10)/10).toLocaleString("ja-JP",{minimumFractionDigits:1,maximumFractionDigits:1}); }
+function n2(v){ return (Math.round(v*100)/100).toFixed(2); }
+function yen(v){ return Math.round(v).toLocaleString("ja-JP") + " 円"; }
+function pct(v){ return v.toFixed(1) + " ％"; }
+
+/* ---------- 入力の集約 ---------- */
+function readInputs(){
+  return {
+    service:svcKey, sizes:sizes, week:num("week"),
+    mode:mode, autoRev:autoRev,
+    price:num("price"), rev:num("rev"), ratio:num("ratio"), total:num("total"),
+    fuku:num("fuku"), bonus:num("bonus"), hiW:num("hi-w"),
+    scale:scale, nminAuto:!nminTouched, nminManual:num("nmin"), atgt:num("atgt"),
+    rows:rows
+  };
+}
+
+/* ---------- 規模入力 ---------- */
+function buildScaleFields(){
+  var svc = S[svcKey], html = "";
+  svc.fields.forEach(function(f){
+    if (sizes[f.k] === undefined) sizes[f.k] = f.val;
+    html += '<div class="field"><label for="sz-'+f.k+'">'+f.label+'</label>' +
+            '<div class="inline"><input type="number" id="sz-'+f.k+'" data-sz="'+f.k+'" value="'+sizes[f.k]+
+            '" step="'+f.step+'" min="0"><span class="unit">'+f.unit+'</span></div></div>';
+  });
+  $("scale-fields").innerHTML = html;
+  $("svc-note").textContent = svc.note;
+}
+
+function priceHintText(){
+  var svc = S[svcKey];
+  return (svc.priceBasis === "day"
+      ? "年間収益＝利用者数 × 単価 × 年間稼働日数（" + ENGINE.annualMult(svc, sizes, num("week")) + "日）。"
+      : "年間収益＝利用者数 × 単価 × 12か月。")
+    + "地域区分・要介護度構成・加算・規模区分で大きく変わります。決算書の収益 ÷ 延べ利用者数で実額に置き換えてください（初期値は未検証のサンプル）。";
+}
+
+/* ---------- 表 ---------- */
+function buildTable(){
+  var tb = $("tbody");
+  tb.innerHTML = "";
+  rows.forEach(function(r, i){
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td><span class="rolename">'+r.name+'</span><span class="rolenote" data-c="note"></span></td>' +
+      '<td class="std" data-c="std"></td>' +
+      '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="n" value="'+r.n+'"></td>' +
+      '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="hi" value="'+(r.hi||0)+'"></td>' +
+      '<td><input type="number" step="5" min="0" data-i="'+i+'" data-f="a" value="'+r.a+'"></td>' +
+      '<td class="calc" data-c="tot"></td>' +
+      '<td class="calc" data-c="se"></td>' +
+      '<td class="calc" data-c="hi"></td>' +
+      '<td><button class="del" data-del="'+i+'" aria-label="この行を削除">×</button></td>';
+    tb.appendChild(tr);
+  });
+}
+
+function refreshTable(c){
+  var trs = $("tbody").children;
+  for (var i = 0; i < c.rows.length && i < trs.length; i++){
+    var r = c.rows[i], t = trs[i];
+    t.querySelector('[data-c="note"]').textContent = r.note || "";
+    t.querySelector('[data-c="std"]').textContent  = (r.std == null) ? "–" : n1(r.std);
+    t.querySelector('[data-c="tot"]').textContent  = n1(r.totalFte);
+    t.querySelector('[data-c="se"]').textContent   = (r.n  > 0) ? n1(r.salarySe) : "–";
+    t.querySelector('[data-c="hi"]').textContent   = (r.hi > 0) ? n1(r.salaryHi) : "–";
+  }
+  $("f-std").textContent   = n1(c.stdN);
+  $("f-nbase").textContent = n1(c.baseS);
+  $("f-hi").textContent    = n1(c.baseH);
+  $("f-n").textContent     = n1(c.n);
+  $("f-a").textContent     = c.nSe > 0 ? n1(c.avgSe) : "–";
+  $("f-e").textContent     = c.nHi > 0 ? n1(c.avgHi) : "–";
+}
+
+/* ---------- 数値パネル ---------- */
+function renderNumbers(c){
+  $("o-total").textContent    = man(c.total);
+  $("o-wagepool").textContent = man(c.pool);
+  $("o-ratio").textContent    = c.rev > 0 ? pct(c.effRatio) : "収益 未入力";
+  $("o-n").textContent        = n1(c.n);
+  $("bench").textContent      = "参考：" + c.svc.bench + "％（" + c.svc.benchNote + "）";
+  $("nmin-note").innerHTML =
+    "職種別の基準をすべて満たすには、いまの職種構成のままだと合計 <b>" +
+    (isFinite(c.nMinComp) ? n1(c.nMinComp) + " 人</b>必要です（基準の単純合計は " + n1(c.stdN) + " 人）。" +
+      "構成に偏りがあると、合計を満たしても職種別では基準を割ります。"
+     : "—</b>。基準のある職種に0人があるため、人数を増やしても基準を満たせません。") +
+    (nminTouched ? "（手入力中のため自動では動きません）" : "（手入力するまでこの値に追従します）");
+  if ($("tbody").children.length !== rows.length) buildTable();
+  refreshTable(c);
+}
+
+function renderEmp(c){
+  var h = "";
+  h += '<div class="row lead"><span class="k">正規比率</span><span class="v">' + (100 - c.hiRate).toFixed(1) + ' ％</span></div>';
+  h += '<div class="row"><span class="k">正規　常勤換算</span><span class="v">' + n1(c.nSe) + ' 人</span></div>';
+  h += '<div class="row"><span class="k">　平均年収／月例給</span><span class="v">' +
+       (c.nSe > 0 ? n1(c.avgSe) + ' 万・' + yen(c.avgSe*10000/(12+c.bonus)) : "–") + '</span></div>';
+  h += '<div class="row"><span class="k">非正規　常勤換算</span><span class="v">' + n1(c.nHi) + ' 人</span></div>';
+  h += '<div class="row"><span class="k">　平均年収／月例給</span><span class="v">' +
+       (c.nHi > 0 ? n1(c.avgHi) + ' 万・' + yen(c.avgHi*10000/(12+c.bonus)) : "–") + '</span></div>';
+  $("emp-readout").innerHTML = h;
+}
+
+function renderRatio(c){
+  var r = c.svc.ratio, cells = "";
+  cells += '<div class="cell"><span class="k">平均年収（額面）</span><span class="v">'+n1(c.avg)+
+           '</span><span class="s">万円　月例給 '+yen(c.avg*10000/(12+c.bonus))+'</span></div>';
+  cells += '<div class="cell"><span class="k">1人あたり人件費</span><span class="v">'+n1(c.perHead)+
+           '</span><span class="s">万円　事業主負担 '+c.fuku+'％ 込み</span></div>';
+  cells += '<div class="cell"><span class="k">賃金倍率</span><span class="v">×'+c.k.toFixed(3)+
+           '</span><span class="s">基準年収 × この倍率 ＝ 正規年収</span></div>';
+  cells += '<div class="cell"><span class="k">正規比率</span><span class="v">'+(100-c.hiRate).toFixed(0)+
+           ' ％</span><span class="s">常勤換算ベース（非正規 '+n1(c.nHi)+' 人）</span></div>';
+  if (r && c.coreN > 0 && c.users > 0){
+    if (r.invert){
+      cells += '<div class="cell"><span class="k">'+r.label+'</span><span class="v">'+n1(c.ratioActual)+
+               '</span><span class="s">人／職員1人（常勤換算 '+n1(c.coreN)+' 人）</span></div>';
+    } else {
+      var s = r.std
+        ? (c.ratioBad ? "<b>基準 "+r.std+" : 1 を満たしていません</b>"
+                      : "基準 "+r.std+" : 1 の "+n2(r.std/c.ratioActual)+" 倍の手厚さ")
+        : "常勤換算ベース";
+      cells += '<div class="cell'+(c.ratioBad?" warn":"")+'"><span class="k">'+r.label+'</span><span class="v">'+
+               n2(c.ratioActual)+' : 1</span><span class="s">'+s+'</span></div>';
+    }
+  }
+  cells += '<div class="cell"><span class="k">基準合計との差</span><span class="v">'+
+           (c.n - c.stdN >= 0 ? "＋" : "−") + n1(Math.abs(c.n - c.stdN)) +
+           '</span><span class="s">人（基準 '+n1(c.stdN)+' 人に対して）</span></div>';
+  $("ratiobar").innerHTML = cells;
+}
+
+function renderCompliance(c){
+  var box = $("compliance"), h = "";
+  if (c.blocked){
+    box.className = "verdict no";
+    h += "<h3>職種別の基準を満たせません</h3>";
+    h += "<p><b>" + c.blocked + "</b>に基準があるのに0人です。合計人数をいくら増やしても、この職種は埋まりません。</p>";
+  } else if (c.shorts.length){
+    box.className = "verdict no";
+    h += "<h3>職種別の基準を下回っています</h3>";
+    h += "<p>合計人数が足りていても、職種別の基準は別に満たす必要があります。不足しているのは次の職種です。</p><ul>";
+    c.shorts.forEach(function(x){ h += "<li>" + x.name + "：<b class='num'>" + n1(x.gap) + "</b> 人 不足</li>"; });
+    h += "</ul><p>いまの構成のまま満たすなら合計 <b class='num'>" + n1(c.nMinComp) +
+         "</b> 人まで増やすか、下の「不足職種を基準まで埋める」で構成を直します。</p>";
+  } else {
+    box.className = "verdict";
+    h += "<h3>職種別の基準は満たしています</h3><p>基準のあるすべての職種で、配置後人数が基準以上です。</p>";
+  }
+  box.innerHTML = h;
+}
+
+function renderVerdict(c){
+  var box = $("verdict"), h = "";
+  if (!c.feasible){
+    box.className = "verdict no";
+    h += "<h3>この原資では両立しません</h3>";
+    h += "<p>常勤換算 <b class='num'>"+n1(c.nmin)+"</b> 人を平均年収 <b class='num'>"+n1(c.atgt)+
+         "</b> 万円で雇うには給与原資 <b class='num'>"+man(c.needPool)+"</b>（人件費総額 <b class='num'>"+
+         man(c.needTotal)+"</b>）が必要で、いまの原資では <b class='num'>"+man(Math.abs(c.gap))+"</b> 足りません。</p>";
+    h += "<p>いまの原資で守れるのは、<b>人数なら "+n1(c.nCap)+" 人まで</b>か、<b>賃金なら平均 "+
+         n1(c.pool / (c.nmin || 1))+" 万円まで</b>のどちらかです。</p><ul>";
+    if (c.rev > 0) h += "<li>収益を変えずに両立させる → 人件費率 <b class='num'>"+pct(c.needRatio)+"</b>（現在 "+pct(c.effRatio)+"）</li>";
+    if (c.mode === "ratio" && c.ratioIn > 0) h += "<li>人件費率を変えずに両立させる → 年間収益 <b class='num'>"+man(c.needRev)+"</b>（現在 "+man(c.rev)+"、差 "+man(c.needRev-c.rev)+"）</li>";
+    h += "<li>どちらも動かせない → 配置か賃金のどちらを下げるかの判断になります</li></ul>";
+  } else {
+    box.className = "verdict";
+    h += "<h3>成立する幅があります</h3>";
+    h += "<p>この原資なら、常勤換算 <b class='num'>"+n1(c.nmin)+"</b> 〜 <b class='num'>"+n1(c.nCap)+
+         "</b> 人の範囲で両方の線を守れます。幅は <b class='num'>"+n1(c.nCap-c.nmin)+"</b> 人分です。</p>";
+    if (c.okN && c.okA){
+      h += "<p>いまの置き方（<b class='num'>"+n1(c.n)+"</b> 人 / 平均 <b class='num'>"+n1(c.avg)+"</b> 万円）はこの範囲の中にあります。</p>";
+    } else {
+      h += "<p><b>いまの置き方は範囲の外</b>です。";
+      if (!c.okN) h += "人数が下限を "+n1(c.nmin-c.n)+" 人分下回っています。";
+      if (!c.okA) h += "平均年収が下限を "+n1(c.atgt-c.avg)+" 万円下回っています。";
+      h += "</p>";
+    }
+  }
+  box.innerHTML = h;
+}
+
+function renderMarginal(c){
+  var m = c.marg, h = "";
+  h += "<div class='row'><span class='k'>常勤換算を1人増やす</span><span class='v'>平均年収 −"+n1(m.perPerson)+" 万円</span></div>";
+  h += "<div class='row'><span class='k'>全員の年収を10万円上げる：必要な追加原資</span><span class='v'>"+man(m.needMoreTotal)+"</span></div>";
+  h += "<div class='row'><span class='k'>　同じことを人員削減でまかなうなら</span><span class='v'>常勤換算 −"+n1(m.cutN)+" 人</span></div>";
+  if (c.rev > 0) h += "<div class='row'><span class='k'>　人件費率で吸収するなら</span><span class='v'>＋"+m.ptUp.toFixed(1)+" ポイント</span></div>";
+  if (c.mode === "ratio" && c.ratioIn > 0) h += "<div class='row'><span class='k'>　収益増でまかなうなら</span><span class='v'>＋"+man(m.revUp)+"</span></div>";
+  if (c.nSe > 0){
+    h += "<div class='row' style='border-top:1px solid var(--rule);margin-top:8px;padding-top:10px'><span class='k'>非正規比率を10ポイント上げる（"+
+         m.hiNow.toFixed(0)+"→"+m.hiNew.toFixed(0)+"％）</span><span class='v'></span></div>";
+    h += "<div class='row'><span class='k'>　賃金水準を保つなら</span><span class='v'>常勤換算 ＋"+n1(m.dN)+" 人</span></div>";
+    h += "<div class='row'><span class='k'>　人数を保つなら</span><span class='v'>正規の年収 "+
+         (m.dAvgSe >= 0 ? "＋" : "−") + n1(Math.abs(m.dAvgSe))+" 万円</span></div>";
+  }
+  h += "<p class='hint' style='margin-top:10px'>賃金制度を見直すときは、どれを選ぶのかを先に決めます。等級や評価の設計は、原資の出どころが決まったあとの配分の話です。非正規比率は、原資を増やさずに人数か正規の賃金かのどちらかを取りにいける唯一の手ですが、定着と育成の負荷が別の形で返ってきます。</p>";
+  $("marginal").innerHTML = h;
+}
+
+/* ---------- 曲線 ---------- */
+var SVGNS = "http://www.w3.org/2000/svg";
+var VB = {w:640, h:400, l:64, r:22, t:20, b:46};
+var view = null;
+function el(tag, attrs, text){
+  var e = document.createElementNS(SVGNS, tag);
+  for (var q in attrs) e.setAttribute(q, attrs[q]);
+  if (text != null) e.textContent = text;
+  return e;
+}
+function niceStep(raw){
+  var p = Math.pow(10, Math.floor(Math.log(raw)/Math.LN10)), m = raw/p;
+  return (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * p;
+}
+function renderChart(c){
+  var svg = $("chart");
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  var nCap = isFinite(c.nCap) ? c.nCap : c.n * 2;
+  var xs = [c.n, c.nmin, nCap, c.baseN, c.stdN, isFinite(c.nMinComp) ? c.nMinComp : 0]
+             .filter(function(v){ return v > 0 && isFinite(v); });
+  if (!xs.length) return;
+  var xmax = Math.max.apply(null, xs)*1.25 + 1;
+  var xmin = Math.max(0.4, Math.min.apply(null, xs)*0.55);
+  var ymax = Math.max(c.pool/xmin, c.atgt*1.35, 1);
+  var PW = VB.w-VB.l-VB.r, PH = VB.h-VB.t-VB.b;
+  var X = function(v){ return VB.l + (v-xmin)/(xmax-xmin)*PW; };
+  var Y = function(v){ return VB.t + PH - (v/ymax)*PH; };
+  view = {xmin:xmin, xmax:xmax, PW:PW};
+  var i, step = niceStep(ymax/5);
+  for (i = step; i <= ymax; i += step){
+    svg.appendChild(el("line",{x1:VB.l,x2:VB.l+PW,y1:Y(i),y2:Y(i),stroke:"#DCE3E8","stroke-width":1}));
+    svg.appendChild(el("text",{x:VB.l-9,y:Y(i)+4,"text-anchor":"end","font-size":10,fill:"#4A5C68","font-family":"ui-monospace,Menlo,monospace"}, String(Math.round(i))));
+  }
+  var xstep = niceStep((xmax-xmin)/5);
+  for (i = Math.ceil(xmin/xstep)*xstep; i <= xmax; i += xstep){
+    svg.appendChild(el("text",{x:X(i),y:VB.t+PH+18,"text-anchor":"middle","font-size":10,fill:"#4A5C68","font-family":"ui-monospace,Menlo,monospace"}, String(Math.round(i))));
+  }
+  svg.appendChild(el("line",{x1:VB.l,x2:VB.l+PW,y1:VB.t+PH,y2:VB.t+PH,stroke:"#101F2B","stroke-width":1.5}));
+  svg.appendChild(el("line",{x1:VB.l,x2:VB.l,y1:VB.t,y2:VB.t+PH,stroke:"#101F2B","stroke-width":1.5}));
+  svg.appendChild(el("text",{x:VB.l,y:VB.t-6,"font-size":10.5,fill:"#4A5C68"},"平均年収（万円）"));
+  svg.appendChild(el("text",{x:VB.l+PW,y:VB.t+PH+36,"text-anchor":"end","font-size":10.5,fill:"#4A5C68"},"常勤換算数（人）"));
+
+  function path(a,b){
+    var d = "", first = true;
+    for (var s = 0; s <= 90; s++){
+      var v = a + (b-a)*s/90;
+      if (v <= 0) continue;
+      var y = c.pool/v;
+      if (y > ymax*1.02){ first = true; continue; }
+      d += (first?"M":"L") + X(v).toFixed(1) + " " + Y(y).toFixed(1) + " ";
+      first = false;
+    }
+    return d;
+  }
+  svg.appendChild(el("path",{d:path(xmin,xmax),fill:"none",stroke:"#9FB0BC","stroke-width":1.5,"stroke-dasharray":"3 3"}));
+  var lo = Math.max(c.nmin,xmin), hi = Math.min(nCap, xmax);
+  if (hi > lo) svg.appendChild(el("path",{d:path(lo,hi),fill:"none",stroke:"#2A7F72","stroke-width":4,"stroke-linecap":"round"}));
+
+  if (c.stdN > xmin && c.stdN < xmax){
+    svg.appendChild(el("line",{x1:X(c.stdN),x2:X(c.stdN),y1:VB.t,y2:VB.t+PH,stroke:"#8FA3B0","stroke-width":1,"stroke-dasharray":"2 4"}));
+    svg.appendChild(el("text",{x:X(c.stdN)+4,y:VB.t+PH-6,"font-size":10,fill:"#5A6B78"},"基準の単純合計 "+n1(c.stdN)));
+  }
+  if (isFinite(c.nMinComp) && c.nMinComp > xmin && c.nMinComp < xmax && Math.abs(c.nMinComp - c.nmin) > 0.05){
+    svg.appendChild(el("line",{x1:X(c.nMinComp),x2:X(c.nMinComp),y1:VB.t,y2:VB.t+PH,stroke:"#B23A2E","stroke-width":1.2,"stroke-dasharray":"4 3"}));
+    svg.appendChild(el("text",{x:X(c.nMinComp)+4,y:VB.t+PH-20,"font-size":10,fill:"#B23A2E"},"職種別基準 "+n1(c.nMinComp)));
+  }
+  if (c.nmin > xmin && c.nmin < xmax){
+    svg.appendChild(el("line",{x1:X(c.nmin),x2:X(c.nmin),y1:VB.t,y2:VB.t+PH,stroke:"#1B4965","stroke-width":1.4,"stroke-dasharray":"6 4"}));
+    svg.appendChild(el("text",{x:X(c.nmin)+5,y:VB.t+12,"font-size":10.5,fill:"#1B4965"},"配置下限 "+n1(c.nmin)+"人"));
+  }
+  if (c.atgt > 0 && c.atgt < ymax){
+    svg.appendChild(el("line",{x1:VB.l,x2:VB.l+PW,y1:Y(c.atgt),y2:Y(c.atgt),stroke:"#1B4965","stroke-width":1.4,"stroke-dasharray":"6 4"}));
+    svg.appendChild(el("text",{x:VB.l+PW-4,y:Y(c.atgt)-6,"text-anchor":"end","font-size":10.5,fill:"#1B4965"},"賃金下限 "+n1(c.atgt)+"万円"));
+  }
+  if (hi <= lo) svg.appendChild(el("text",{x:VB.l+PW/2,y:VB.t+PH/2,"text-anchor":"middle","font-size":13,fill:"#B23A2E","font-weight":"600"},"両立する区間なし"));
+
+  if (c.n > 0 && c.avg <= ymax){
+    var cx = X(c.n), cy = Y(c.avg);
+    svg.appendChild(el("line",{x1:cx,x2:cx,y1:cy,y2:VB.t+PH,stroke:"#B8801F","stroke-width":1,"stroke-dasharray":"2 3"}));
+    svg.appendChild(el("circle",{cx:cx,cy:cy,r:11,fill:"#B8801F","fill-opacity":.16}));
+    svg.appendChild(el("circle",{cx:cx,cy:cy,r:5.5,fill:"#B8801F",stroke:"#fff","stroke-width":2}));
+    var right = cx > VB.l+PW*0.7;
+    svg.appendChild(el("text",{x:cx+(right?-10:10),y:cy-16,"text-anchor":right?"end":"start","font-size":12,"font-weight":"600",fill:"#101F2B"},
+      n1(c.n)+"人 / "+n1(c.avg)+"万円"));
+  }
+}
+
+/* ---------- 書き出し ---------- */
+function makeText(c){
+  var L = [];
+  L.push("【人件費トレードオフ・シミュレーター v0.3】");
+  L.push("サービス種別：" + c.svcName);
+  c.svc.fields.forEach(function(f){ L.push("　" + f.label + "：" + sizes[f.k] + f.unit); });
+  L.push("");
+  L.push("年間収益：" + man(c.rev) + (c.autoRev && c.mode === "ratio" ? "（規模×単価 " + c.price.toLocaleString("ja-JP") + "円 から概算）" : "") + "／人件費率：" + pct(c.effRatio));
+  L.push("人件費総額：" + man(c.total) + "（法定福利費 " + c.fuku + "％込み）");
+  L.push("給与原資：" + man(c.pool));
+  L.push("");
+  L.push("配置：常勤換算 " + n1(c.n) + " 人（基準の単純合計 " + n1(c.stdN) + " 人）");
+  L.push("職種別の基準充足：" + (c.blocked ? "満たせません（" + c.blocked + "が0人）"
+        : c.shorts.length ? "未達 — " + c.shorts.map(function(x){ return x.name + " " + n1(x.gap) + "人不足"; }).join("、")
+        : "すべての職種で基準以上"));
+  if (isFinite(c.nMinComp)) L.push("　いまの構成で基準を満たす最小合計：" + n1(c.nMinComp) + " 人");
+  L.push("平均年収（額面）：" + n1(c.avg) + " 万円／月例給 " + yen(c.avg*10000/(12+c.bonus)) + "（賞与 " + c.bonus + "ヶ月換算）");
+  L.push("1人あたり人件費（事業主負担込み）：" + n1(c.perHead) + " 万円");
+  L.push("賃金倍率：×" + c.k.toFixed(3) + "（基準年収に対する実水準）");
+  L.push("");
+  L.push("雇用区分：正規 " + n1(c.nSe) + " 人／非正規 " + n1(c.nHi) + " 人（正規比率 " + (100-c.hiRate).toFixed(1) + "％）");
+  if (c.nSe > 0) L.push("　正規 平均年収 " + n1(c.avgSe) + " 万円／月例給 " + yen(c.avgSe*10000/(12+c.bonus)));
+  if (c.nHi > 0) L.push("　非正規 平均年収 " + n1(c.avgHi) + " 万円／月例給 " + yen(c.avgHi*10000/(12+c.bonus)) + "（水準 " + (c.hw*100).toFixed(0) + "％）");
+  if (c.svc.ratio && c.coreN > 0 && c.users > 0){
+    L.push(c.svc.ratio.label + "：" + (c.svc.ratio.invert ? n1(c.ratioActual) + " 人／職員1人" : n2(c.ratioActual) + " : 1")
+      + (c.ratioBad ? "　※基準未達" : ""));
+  }
+  L.push("");
+  L.push("※ 配置基準の自動計算は主要職種の要約であり、加算要件・自治体条例・経過措置は未反映。");
+  L.push("※ 年収・月例給は額面。事業主負担の法定福利費は含みません。");
+  L.push("※ 基準年収・法定福利費率・賞与月数・非正規の賃金水準はサンプル値（未検証）。");
+  L.push("※ 収益・人件費は決算書ベースで、処遇改善加算は分離していません。");
+  return L.join("\n");
+}
+
+/* ---------- 更新 ---------- */
+var last = null;
+function update(){
+  var c = ENGINE.calcState(readInputs());
+  last = c;
+  if (autoRev && mode === "ratio") $("rev").value = Math.round(c.rev);
+  if (!nminTouched) $("nmin").value = Math.round(c.nmin * 10) / 10;
+  renderNumbers(c); renderEmp(c); renderRatio(c);
+  renderCompliance(c); renderVerdict(c); renderMarginal(c); renderChart(c);
+  return c;
+}
+window.__SWMD_STATE = function(){ return last; };
+
+function applyAutoRev(){
+  var on = autoRev && mode === "ratio";
+  $("price-field").hidden = !on;
+  $("rev").readOnly = on;
+  $("auto-rev").checked = autoRev;
+}
+
+function loadService(){
+  var svc = S[svcKey];
+  sizes = {}; nminTouched = false; scale = 1;
+  buildScaleFields();
+  rows = ENGINE.initialRows(svcKey, sizes, num("week"));
+  $("scale").value = 1;
+  $("ratio").value = svc.bench;
+  $("rev").value = svc.defRev;
+  $("total").value = Math.round(svc.defRev * svc.bench / 100);
+  $("price").value = svc.unitPrice;
+  $("price-label").textContent = svc.priceLabel;
+  $("price-hint").textContent = priceHintText();
+  applyAutoRev();
+  buildTable();
+  update();
+}
+
+/* ---------- 起動と操作 ---------- */
+(function(){
+  var sel = $("svc"), html = "";
+  for (var q in S) html += '<option value="'+q+'">'+S[q].name+'</option>';
+  sel.innerHTML = html; sel.value = svcKey;
+})();
+
+$("svc").addEventListener("change", function(){ svcKey = this.value; loadService(); });
+
+document.addEventListener("input", function(e){
+  var t = e.target;
+  if (t.dataset && t.dataset.sz !== undefined){
+    sizes[t.dataset.sz] = parseFloat(t.value) || 0;
+    $("price-hint").textContent = priceHintText();
+    update(); return;
+  }
+  if (t.dataset && t.dataset.i !== undefined){
+    rows[+t.dataset.i][t.dataset.f] = parseFloat(t.value) || 0;
+    update(); return;
+  }
+  if (t.id === "scale"){ scale = parseFloat(t.value); update(); return; }
+  if (t.id === "auto-rev"){ autoRev = t.checked; applyAutoRev(); update(); return; }
+  if (t.id === "nmin"){ nminTouched = true; update(); return; }
+  update();
+});
+
+document.addEventListener("click", function(e){
+  var t = e.target, c;
+  if (t.dataset && t.dataset.del !== undefined){
+    if (rows.length > 1) rows.splice(+t.dataset.del, 1);
+    buildTable(); update(); return;
+  }
+  if (t.id === "add"){
+    rows.push({key:"custom"+rows.length, name:"追加した職種", note:"手入力", n:1, hi:0, a:400});
+    buildTable(); update(); return;
+  }
+  if (t.id === "reset-roles"){
+    rows = ENGINE.initialRows(svcKey, sizes, num("week"));
+    scale = 1; $("scale").value = 1; buildTable(); update(); return;
+  }
+  if (t.id === "fill-std"){
+    c = update();
+    rows.forEach(function(r, i){
+      var std = c.rows[i] ? c.rows[i].std : null;
+      if (!std || std <= 0) return;
+      var need = std / (scale || 1), tot = r.n + (r.hi || 0);
+      if (tot < need) r.n = Math.ceil((r.n + (need - tot)) * 10) / 10;
+    });
+    buildTable(); update(); return;
+  }
+  if (t.id === "fit-wage"){
+    c = update();
+    var Bs = 0, Bh = 0;
+    c.rows.forEach(function(r){ Bs += r.n * r.a; Bh += r.hi * r.a * c.hw; });
+    var needTotal = (Bs + Bh) * scale * (1 + c.fuku/100);
+    if (mode === "direct") $("total").value = Math.round(needTotal);
+    else if (c.rev > 0) $("ratio").value = Math.round(needTotal / c.rev * 1000) / 10;
+    update(); return;
+  }
+  if (t.id === "use-std"){ nminTouched = false; update(); return; }
+  if (t.id === "mk"){ var o = $("out"); o.hidden = false; o.value = makeText(update()); o.select(); return; }
+  if (t.id === "mode-ratio" || t.id === "mode-direct"){
+    mode = (t.id === "mode-ratio") ? "ratio" : "direct";
+    $("mode-ratio").setAttribute("aria-pressed", mode === "ratio");
+    $("mode-direct").setAttribute("aria-pressed", mode === "direct");
+    $("ratio-fields").hidden = (mode !== "ratio");
+    $("direct-fields").hidden = (mode !== "direct");
+    applyAutoRev(); update();
+  }
+});
+
+(function(){
+  var svg = $("chart"), dragging = false;
+  function apply(ev){
+    if (!view) return;
+    var box = svg.getBoundingClientRect();
+    var px = (ev.clientX - box.left)/box.width*VB.w;
+    var v = view.xmin + (px - VB.l)/view.PW*(view.xmax - view.xmin);
+    var baseN = rows.reduce(function(s,r){ return s + r.n + (r.hi || 0); }, 0);
+    if (baseN <= 0) return;
+    scale = Math.min(1.8, Math.max(0.4, v/baseN));
+    $("scale").value = scale;
+    update();
+  }
+  svg.addEventListener("pointerdown", function(e){ dragging = true; svg.setPointerCapture(e.pointerId); apply(e); });
+  svg.addEventListener("pointermove", function(e){ if (dragging) apply(e); });
+  svg.addEventListener("pointerup", function(){ dragging = false; });
+  svg.addEventListener("pointercancel", function(){ dragging = false; });
+})();
+
+loadService();
+})();
+/* ===== SWMD-UI:END ===== */
+
+</script>
+</body>
+</html>
