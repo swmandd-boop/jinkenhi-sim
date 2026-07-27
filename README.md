@@ -11,13 +11,19 @@ engine.mjs                 自動生成。編集しない（jinkenhi-sim.html �
 tools/extract-engine.mjs   本体の ENGINE 区間を engine.mjs に抜き出す
 tools/dump-screen.mjs      画面の全表示値をテキストに書き出す（adversarial-review モード2用）
 tests/helpers.mjs          テスト用の入力生成とUI操作の再現
-tests/invariants.test.mjs  計算層の不変条件（INV-01〜21・RKN-01）
-tests/ui.test.mjs          画面の矛盾検出（UI-01〜08・実バグの回帰を含む）
+tests/invariants.test.mjs  計算層の不変条件（INV-01〜21・RKN-01・KANGO-01）
+tests/ui.test.mjs          画面の矛盾検出（UI-01〜12・実バグの回帰を含む・jsdom）
 tests/initial-roster.test.mjs 起動直後の基準配置の回帰（INIT-01/02）
+tests/layout.test.mjs      実ピクセルのレイアウト検査（ヘッドレスChrome・欠け／右余白／横スクロール）
 tests/explore.mjs          ランダム入力の探索テスト（既定 10,000 ケース）
 review/screen-dump.txt     自動生成。レビュー材料
 docs/v0.4-設計.md          v0.4 の変更仕様（実装の正本）
 ```
+
+`tests/layout.test.mjs` は jsdom では測れない実ピクセルの欠け・右余白・横スクロールを、
+ヘッドレス Chrome（`puppeteer-core`＋システムChrome）で複数のウィンドウ幅を描画して検査する。
+Chrome の場所は `CHROME_PATH` で上書きでき、見つからなければ失敗する（構成担保テストでは
+実ピクセルの代替にならないため、この機械チェックを必須ゲートとする方針）。
 
 ## 設計の約束（守らないとテストが機能しなくなる）
 
@@ -38,12 +44,16 @@ docs/v0.4-設計.md          v0.4 の変更仕様（実装の正本）
 ## 使い方
 
 ```bash
-npm install          # jsdom のみ（UIテストとダンプ生成に使う）
-npm test             # engine 抜き出し → 不変条件・UI・回帰テスト（計29件）
+npm install          # jsdom＋puppeteer-core（レイアウトの実ピクセル検査に使う）
+npm test             # engine 抜き出し → 不変条件・UI・回帰・レイアウト（計38件）
 npm run explore      # ランダム10,000ケースの探索テスト
+npm run layout       # レイアウトのみ（ヘッドレスChromeで実ピクセル検査）
 npm run dump         # review/screen-dump.txt を生成
 npm run check        # test + explore
 ```
+
+`npm test` はレイアウト検査（`tests/layout.test.mjs`）を含むため **Google Chrome が必要**。
+場所は `CHROME_PATH=/path/to/chrome npm test` で上書きできる。
 
 `npm run explore 50000 12345` のようにケース数とシードを指定できる。
 違反が出た場合は、再現用の入力オブジェクトがそのまま標準エラーに出力される。
@@ -60,10 +70,13 @@ npm run check        # test + explore
 
 ## 検証の状態（2026-07-27 時点）
 
-- テスト合計 **29 件：PASS**（`npm run check`）
-  - 不変条件 INV-01〜21（v0.4で INV-08/09 削除、INV-15〜21 追加）＋老健栄養士 RKN-01
-  - UIの矛盾検出 UI-01〜08（スライダー確定 UI-06/07、定点 UI-08 を含む）
+- テスト合計 **38 件：PASS**（`npm run check`）
+  - 不変条件 INV-01〜21（v0.4で INV-08/09 削除、INV-15〜21 追加）＋老健栄養士 RKN-01＋看護境界 KANGO-01
+  - UIの矛盾検出 UI-01〜12（スライダー確定 UI-06/07、定点 UI-08、必要人件費率ゲート UI-09、
+    スライダー構成保持 UI-10、つまみ位置 UI-11、レイアウト構成担保 UI-12 を含む・jsdom）
   - 起動直後の基準配置 INIT-01/02（回帰）
+  - **レイアウト実ピクセル LAYOUT-1280/1440/1680/narrow**（ヘッドレスChrome）。修正前コミット
+    （切れ／右余白）で落ち、修正後で通ることを確認済み
 - 探索テスト 10,000 ケース × シード3種（既定・12345・99999）：違反 0 件（14不変条件）
 - **adversarial-review（モード2）：実施済み（2026-07-26）**。両モデルが挙げた
   「老健 起動直後の丸め矛盾」1件を修正（commit 8969f07）。`review/adversarial-review-結果.md`

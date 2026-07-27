@@ -8,10 +8,12 @@
     "build": "node tools/extract-engine.mjs",
     "test": "npm run build && node --test tests/*.test.mjs",
     "explore": "npm run build && node tests/explore.mjs",
+    "layout": "node --test tests/layout.test.mjs",
     "dump": "npm run build && node tools/dump-screen.mjs",
     "check": "npm run test && npm run explore"
   },
   "devDependencies": {
-    "jsdom": "^24.0.0"
+    "jsdom": "^24.0.0",
+    "puppeteer-core": "^25.3.0"
   }
 }
