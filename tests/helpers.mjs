@@ -39,14 +39,3 @@ export function fillStd(I) {
   });
   return { ...I, rows };
 }
-
-/** 賃金倍率を1.000に合わせる（UIの「入力した基準年収どおりにする」と同じ操作） */
-export function fitWage(I) {
-  const c = calcState(I);
-  let Bs = 0, Bh = 0;
-  c.rows.forEach(r => { Bs += r.n * r.a; Bh += r.hi * r.a * c.hw; });
-  const needTotal = (Bs + Bh) * I.scale * (1 + I.fuku / 100);
-  return I.mode === "direct"
-    ? { ...I, total: needTotal }
-    : { ...I, ratio: c.rev > 0 ? needTotal / c.rev * 100 : I.ratio };
-}

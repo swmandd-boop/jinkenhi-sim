@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SERVICES, calcState } from "../engine.mjs";
-import { makeInput, run, near, fillStd, fitWage } from "./helpers.mjs";
+import { makeInput, run, near, fillStd } from "./helpers.mjs";
 
 const ALL = Object.keys(SERVICES);
 
@@ -87,27 +87,9 @@ test("INV-07 雇用区分の内訳を変えても原資は変わらない", () =
   }
 });
 
-/* ---- 不変条件8: 非正規年収 ＝ 正規年収 × 賃金水準 ---- */
-test("INV-08 非正規年収は正規年収に賃金水準を掛けた値", () => {
-  for (const hiW of [50, 70, 100, 120]) {
-    const I = makeInput("tokuyou", { hiW });
-    I.rows = I.rows.map(r => ({ ...r, hi: 1 }));
-    const c = calcState(I);
-    for (const r of c.rows) assert.ok(near(r.salaryHi, r.salarySe * hiW / 100), `hiW=${hiW} ${r.name}`);
-  }
-});
-
-/* ---- 不変条件9: 賃金倍率を1に合わせたら配分後年収＝基準年収 ---- */
-test("INV-09 入力どおりにすると賃金倍率が1.000になる", () => {
-  for (const s of ALL) {
-    for (const mode of ["ratio", "direct"]) {
-      const I0 = makeInput(s, { mode, autoRev: mode === "ratio" });
-      const c = calcState(fitWage(I0));
-      assert.ok(near(c.k, 1, 1e-6), `${s} ${mode} k=${c.k}`);
-      for (const r of c.rows) if (r.n > 0) assert.ok(near(r.salarySe, r.a, 1e-6), `${s} ${r.name}`);
-    }
-  }
-});
+/* INV-08（非正規年収＝正規年収×水準・職種別）と INV-09（賃金倍率1.000）は
+   v0.4 で職種別基準年収と賃金倍率 k を廃止したため削除。
+   非正規平均＝正規平均×水準は INV-16 が、payroll 保存は INV-15 が担保する。 */
 
 /* ---- 不変条件10: 不足を埋めたら未達がゼロになる ---- */
 test("INV-10 不足職種を埋めると未達が解消する", () => {
@@ -154,6 +136,41 @@ test("INV-13 自動計算時は規模と収益が連動する", () => {
     const b = calcState({ ...I, sizes: { ...I.sizes, [key]: I.sizes[key] * 2 } });
     assert.ok(b.rev > a.rev * 1.9, `${s} rev ${a.rev} -> ${b.rev}`);
     assert.ok(b.users > a.users * 1.9, s);
+  }
+});
+
+/* ---- 不変条件15（v0.4新式）: 正規payroll＋非正規payroll＝給与原資 ---- */
+test("INV-15 正規payroll＋非正規payroll＝給与原資（恒等式）", () => {
+  for (const s of ALL) {
+    for (const hw of [0, 0.5, 0.7, 1.3]) {
+      for (const scale of [0.7, 1, 1.3]) {
+        const I = makeInput(s, { hiW: hw * 100, scale });
+        I.rows = I.rows.map(r => ({ ...r, hi: r.n * 0.4, n: r.n * 0.6 }));
+        const c = calcState(I);
+        assert.ok(near(c.nSe * c.avgSe + c.nHi * c.avgHi, c.pool, 1e-9),
+          `${s} hw=${hw} scale=${scale}: ${c.nSe*c.avgSe + c.nHi*c.avgHi} ≠ pool ${c.pool}`);
+      }
+    }
+  }
+});
+
+/* ---- 不変条件16（v0.4新式）: 非正規平均＝正規平均×賃金水準 ----
+   v0.3 は職種別基準年収で加重していたため、非正規が特定職種に偏る（非一様な）
+   混在では成り立たなかった。v0.4 は基準年収を廃し avgSe=pool/(nSe+hw*nHi),
+   avgHi=avgSe*hw に統一するので、偏った配置でも常に成立する。
+   ※ 非正規を偶数行だけに寄せた「非一様」構成でテストする（一様配分だと旧式でも
+     偶然一致してしまい、退行を捕らえられないため）。 */
+test("INV-16 非正規平均は正規平均×賃金水準（新式・偏った混在でも成立）", () => {
+  for (const s of ALL) {
+    for (const hw of [0, 0.5, 0.7, 1.0, 1.3]) {
+      for (const scale of [1, 1.3]) {
+        const I = makeInput(s, { hiW: hw * 100, scale });
+        I.rows = I.rows.map((r, i) => (i % 2 === 0) ? { ...r, hi: r.n * 0.6, n: r.n * 0.4 } : { ...r });
+        const c = calcState(I);
+        if (c.nHi > 0) assert.ok(near(c.avgHi, c.avgSe * hw, 1e-9),
+          `${s} hw=${hw} scale=${scale}: avgHi=${c.avgHi} ≠ avgSe*hw=${c.avgSe*hw}`);
+      }
+    }
   }
 });
 

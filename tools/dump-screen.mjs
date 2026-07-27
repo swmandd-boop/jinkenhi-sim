@@ -84,8 +84,8 @@ shots.push(snapshot("04 定員だけ100に変更（構成は据え置き＝基�
 click("fill-std");
 shots.push(snapshot("05 「不足職種を基準まで埋める」を押す"));
 
-click("fit-wage");
-shots.push(snapshot("06 「入力した基準年収どおりにする」を押す（賃金倍率1.000）"));
+setVal("ratio", 39.4);
+shots.push(snapshot("06 人件費率を39.4に下げる（両立しない領域へ）"));
 
 setVal("nmin", 30);
 shots.push(snapshot("07 配置下限を手入力30に下げる（自動追従を切る）"));

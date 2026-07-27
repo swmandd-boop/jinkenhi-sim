@@ -229,8 +229,8 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
 
     <section class="panel">
       <h2>職種別の内訳<span class="tag">STEP 5</span></h2>
-      <p class="hint" style="margin:-6px 0 10px"><b>正規・非正規は、それぞれの常勤換算をそのまま入れてください</b>（内数ではありません）。合計が「基準」以上かどうかで充足を判定します。初期値は正規に基準どおりの人数、非正規は0人です。基準のない職種（事務・調理など）は0人から始まります。加算要件・自治体条例・兼務の扱いで必要数は変わります。<br><b>「基準年収」と「配分後年収」の違い：</b>基準年収は<b>職種間の相対比を決める入力</b>で、水準そのものではありません。給与原資をこの比で按分した結果が配分後年収です。両者の比が「賃金倍率」で、原資が構成に対して厚ければ1を超え、不足すれば1を下回ります。<b>法定福利費とは無関係です。</b>実額どおりに揃えたいときは下の「入力した基準年収どおりにする」を押してください。<br>
-      <b>雇用区分：</b>非正規の年収は STEP4 の賃金水準（既定70％）を掛けた値です。同じ原資でも比率を変えれば、置ける人数か正規の賃金のどちらかが動きます。<br>
+      <p class="hint" style="margin:-6px 0 10px"><b>正規・非正規は、それぞれの常勤換算をそのまま入れてください</b>（内数ではありません）。合計が「基準」以上かどうかで充足を判定します。初期値は正規に基準どおりの人数、非正規は0人です。基準のない職種（事務・調理など）は0人から始まります。加算要件・自治体条例・兼務の扱いで必要数は変わります。<br>
+      <b>平均年収の出し方：</b>給与原資を人数で割った額面です。職種ごとの賃金差は入れていません（総額は職種間の配分に依らないため）。<b>雇用区分：</b>正規の平均年収に対し、非正規は STEP4 の賃金水準（既定70％）を掛けた額です。同じ原資でも比率を変えれば、置ける人数か正規の賃金のどちらかが動きます。<br>
       <b>金額の基準：</b>年収・月例給は<b>額面</b>で、事業主負担の法定福利費は含みません。賃金センサスや求人票の提示年収と同じ土俵の数字です。</p>
       <div class="tbl-scroll">
       <table id="tbl">
@@ -240,10 +240,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
             <th style="width:4.4em">基準<br>常勤換算</th>
             <th style="width:5em">正規<br>常勤換算</th>
             <th style="width:5.4em">非正規<br>常勤換算</th>
-            <th style="width:6.2em">基準年収<br>万円（比の元）</th>
             <th style="width:5em">合計<br>常勤換算</th>
-            <th style="width:6em">正規年収<br>万円</th>
-            <th style="width:6.4em">非正規年収<br>万円</th>
             <th style="width:2em"></th>
           </tr>
         </thead>
@@ -254,10 +251,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
             <td class="std" id="f-std">–</td>
             <td class="calc" id="f-nbase">–</td>
             <td class="calc" id="f-hi">–</td>
-            <td></td>
             <td class="calc" id="f-n">–</td>
-            <td class="calc" id="f-a">–</td>
-            <td class="calc" id="f-e">–</td>
             <td></td>
           </tr>
         </tfoot>
@@ -267,9 +261,8 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
         <button class="addrow" id="add">＋ 職種を追加</button>
         <button class="ghost" id="reset-roles">規模に合わせて置き直す</button>
         <button class="ghost" id="fill-std">不足職種を基準まで埋める</button>
-        <button class="ghost" id="fit-wage">入力した基準年収どおりにする</button>
       </div>
-      <p class="hint">「規模に合わせて置き直す」＝定員や稼働率に比例して実配置を引き直します（手入力した値は消えます）。<br>「入力した基準年収どおりにする」＝賃金倍率が1.000になるよう人件費率（または人件費総額）を逆算します。実際の給与表を入れて<b>必要な人件費率</b>を知りたいときに使います。</p>
+      <p class="hint">「規模に合わせて置き直す」＝定員や稼働率に比例して実配置を引き直します（手入力した値は消えます）。<br>「不足職種を基準まで埋める」＝基準を割っている職種を基準ちょうどまで正規で足します。</p>
     </section>
 
     <section class="panel">
@@ -312,23 +305,22 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
         <li>非正規の事業主負担率は<b>正規と同率として計算しています。</b>社会保険の加入対象外の短時間勤務が多い場合、実際の負担は雇用保険・労災だけになり大きく下がります。その差はこのツールでは反映していません。</li>
         <li>このツールは非正規比率を「原資を増やさずに人数を増やす手段」として扱いますが、定着率・育成コスト・サービスの質は計算していません。比率の判断材料としては不足しています。</li>
       </ul>
-      <h4>「基準年収」は水準ではなく比率です</h4>
+      <h4>平均年収は職種差を入れていません</h4>
       <ul>
-        <li>職種別の年収は、給与原資を「実配置 × 基準年収」の比で按分して決めています。つまり<b>基準年収は職種間の格差を指定する入力</b>で、金額そのものは賃金倍率で上書きされます。</li>
-        <li>賃金倍率は<b>法定福利費とは無関係</b>です。原資はすでに事業主負担を割り戻したあとの額で按分しています。倍率が1.16前後になることがありますが、法定福利費率との一致は偶然です。</li>
-        <li>実際の給与表どおりの金額で見たいときは「入力した基準年収どおりにする」を押します。賃金倍率が1.000になり、そのとき必要な人件費率が逆算されます。<b>この逆算値と現在の人件費率の差が、賃金制度を維持できるかどうかの答えです。</b></li>
+        <li>平均年収は<b>給与原資 ÷ 人数</b>です。職種ごとの賃金差は入力しません。総額は職種間の配分に依らないため、このツールの主題（人数と賃金水準のトレードオフ）には効かないからです。</li>
+        <li>正規と非正規は、<b>正規の平均年収に対し非正規を賃金水準（既定70％）倍</b>として配分します。<b>正規payroll＋非正規payroll＝給与原資</b>が常に成り立ちます。実際の職種別・個人別の水準は、この平均の内側で法人が決める配分です。</li>
       </ul>
       <h4>金額がどの範囲を指しているか</h4>
       <ul>
-        <li>「人件費総額」は決算書の給与費と同じ範囲で、<b>事業主負担の法定福利費を含みます</b>。そこから事業主負担率で割り戻したものが「給与原資」で、職種別の年収・月例給はすべてこの額面ベースです。</li>
+        <li>「人件費総額」は決算書の給与費と同じ範囲で、<b>事業主負担の法定福利費を含みます</b>。そこから事業主負担率で割り戻したものが「給与原資」で、年収・月例給はこの額面ベースです。</li>
         <li>既定の16.5％は健康保険・厚生年金・雇用保険・労災の<b>事業主負担分のおおよその合計</b>です。<b>退職共済掛金や退職給付引当は含んでいません。</b>決算書の人件費から逆算すると18〜19％程度になることが多く、その場合は実額に置き換えてください（この数値も未検証）。</li>
-        <li>決算書の人件費には<b>役員報酬・退職給付費用・通勤手当</b>も入っています。職種表にこれらの行がないと、その分が既存職種の年収に上乗せされ、賃金水準が実態より高く出ます。金額が大きい場合は行を追加してください。</li>
+        <li>決算書の人件費には<b>役員報酬・退職給付費用・通勤手当</b>も入っています。職種表にこれらの行がないと、その分が既存職種に上乗せされ、平均年収が実態より高く出ます。金額が大きい場合は行を追加してください。</li>
         <li>「月例給」は年収を（12＋賞与月数）で割った単純な換算値です。実際の月例給には夜勤手当・時間外・通勤手当が含まれるため、求人票の基本給とは一致しません。</li>
       </ul>
       <h4>数値の検証状況</h4>
       <ul>
         <li>人件費率の参考値は、厚生労働省「令和7年度介護事業経営概況調査」（令和6年度決算）の収入に対する給与費割合のうち<b>全サービス平均64.3％</b>です。<b>収載している4サービスについては、サービス別の実数を未取得のため全サービス平均を暫定適用しています。</b></li>
-        <li>職種別の基準年収、法定福利費率16.5％、賞与月数はいずれも<b>説明用のサンプル値（未検証）</b>です。実データでの較正は行っていません。自法人の実額に置き換えてお使いください。</li>
+        <li>法定福利費率16.5％、賞与月数、非正規の賃金水準はいずれも<b>説明用のサンプル値（未検証）</b>です。実データでの較正は行っていません。自法人の実額に置き換えてお使いください。</li>
         <li>賃金は年収ベースで、退職給付引当・通勤費・派遣委託費・人材紹介手数料は含めていません。</li>
       </ul>
     </div>
@@ -509,8 +501,7 @@ var SERVICES = {
         note: (noteMap[r.key] != null ? noteMap[r.key] : r.note),
         std:  (stdMap[r.key]  != null ? stdMap[r.key]  : null),
         n:  Math.max(0, r.n  || 0),
-        hi: Math.max(0, r.hi || 0),
-        a:  Math.max(0, r.a  || 0)
+        hi: Math.max(0, r.hi || 0)
       };
     });
 
@@ -521,24 +512,23 @@ var SERVICES = {
     var total = (I.mode === "ratio") ? rev * I.ratio / 100 : I.total;
     var pool  = total / (1 + I.fuku / 100);
 
-    /* 人数と賃金 */
-    var baseS = 0, baseH = 0, stdN = 0, Bs = 0, Bh = 0;
+    /* 人数と賃金
+       v0.4: 職種別の基準年収を廃止。給与原資 pool を全員に均一に配り、非正規は
+       正規の hw 倍とする。avgSe*(nSe+hw*nHi)=pool を満たす avgSe が正規の平均年収。
+       職種間の配分（v0.3 の賃金倍率 k）は主題（総額は配分に依らない）と無関係なため削除。 */
+    var baseS = 0, baseH = 0, stdN = 0;
     rows.forEach(function(r){
       baseS += r.n; baseH += r.hi; stdN += (r.std || 0);
-      Bs += r.n * r.a; Bh += r.hi * r.a * hw;
     });
-    var baseN = baseS + baseH, baseW = Bs + Bh;
-    var k    = baseW > 0 ? pool / (baseW * scale) : 0;
+    var baseN = baseS + baseH;
     var n    = baseN * scale, nSe = baseS * scale, nHi = baseH * scale;
     var avg   = n   > 0 ? pool / n : 0;
-    var avgSe = nSe > 0 ? k * Bs * scale / nSe : 0;
-    var avgHi = nHi > 0 ? k * Bh * scale / nHi : 0;
+    var wUnits = nSe + hw * nHi;                 // 正規換算の重み合計
+    var avgSe = wUnits > 0 ? pool / wUnits : 0;  // 正規の平均年収
+    var avgHi = avgSe * hw;                       // 非正規の平均年収
 
     rows.forEach(function(r){
       r.totalFte  = (r.n + r.hi) * scale;
-      r.salarySe  = r.a * k;
-      r.salaryHi  = r.a * hw * k;
-      r.monthlySe = r.salarySe * 10000 / (12 + I.bonus);
     });
 
     /* 職種別の基準充足 */
@@ -577,14 +567,12 @@ var SERVICES = {
     var up = 10, f1 = 1 + I.fuku / 100;
     var needMoreTotal = n * up * f1;
     var hiNow = n > 0 ? nHi / n : 0, hiNew = Math.min(1, hiNow + 0.10);
-    var Cnow = (1 - hiNow) * f1 + hiNow * hw * f1;
-    var Cnew = (1 - hiNew) * f1 + hiNew * hw * f1;
-    var abar  = baseN > 0 ? (Bs + (hw ? Bh / hw : 0)) / baseN : 0;
-    var dB    = (hiNew - hiNow) * baseN * abar;
-    var Bs2 = Bs - dB, Bh2 = Bh + dB * hw;
-    var pool2 = total / f1;
-    var k2 = (Bs2 + Bh2) > 0 ? pool2 / ((Bs2 + Bh2) * scale) : 0;
-    var nSe2 = n * (1 - hiNew);
+    /* 非正規率を +10pt したときの重み係数（正規換算1人あたりコスト）。基準年収に依らない。 */
+    var Cnow = (1 - hiNow) + hiNow * hw;
+    var Cnew = (1 - hiNew) + hiNew * hw;
+    /* 人数を保ったまま非正規率を上げたときの正規平均年収（新式）。 */
+    var wUnits2 = n * ((1 - hiNew) + hw * hiNew);
+    var avgSe2  = wUnits2 > 0 ? pool / wUnits2 : 0;
     var marg = {
       perPerson: n > 0 ? pool / n - pool / (n + 1) : 0,
       needMoreTotal: needMoreTotal,
@@ -593,14 +581,14 @@ var SERVICES = {
       revUp: I.ratio > 0 ? needMoreTotal / (I.ratio / 100) : 0,
       hiNow: hiNow * 100, hiNew: hiNew * 100,
       dN: Cnew > 0 ? n * (Cnow / Cnew - 1) : 0,
-      dAvgSe: nSe2 > 0 ? (k2 * Bs2 * scale / nSe2) - avgSe : 0
+      dAvgSe: avgSe2 - avgSe
     };
 
     return {
       service:I.service, svcName:svc.name, svc:svc, sizes:I.sizes, week:I.week,
       mode:I.mode, autoRev:I.autoRev, price:I.price, scale:scale,
       fuku:I.fuku, bonus:I.bonus, hw:hw, ratioIn:I.ratio, atgt:I.atgt,
-      rev:rev, total:total, pool:pool, effRatio:effRatio, k:k,
+      rev:rev, total:total, pool:pool, effRatio:effRatio,
       rows:rows, baseS:baseS, baseH:baseH, baseN:baseN, stdN:stdN,
       n:n, nSe:nSe, nHi:nHi, hiRate: n > 0 ? nHi / n * 100 : 0,
       avg:avg, avgSe:avgSe, avgHi:avgHi, perHead: avg * (1 + I.fuku / 100),
@@ -622,7 +610,7 @@ var SERVICES = {
   function initialRows(svcKey, sizes, week){
     return buildStandard(svcKey, sizes, week).map(function(r){
       return { key:r.key, name:r.name, note:r.note,
-               n: Math.ceil((r.std || 0) * 10 - 1e-9) / 10, hi:0, a:r.a };
+               n: Math.ceil((r.std || 0) * 10 - 1e-9) / 10, hi:0 };
     });
   }
 
@@ -710,10 +698,7 @@ function buildTable(){
       '<td class="std" data-c="std"></td>' +
       '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="n" value="'+r.n+'"></td>' +
       '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="hi" value="'+(r.hi||0)+'"></td>' +
-      '<td><input type="number" step="5" min="0" data-i="'+i+'" data-f="a" value="'+r.a+'"></td>' +
       '<td class="calc" data-c="tot"></td>' +
-      '<td class="calc" data-c="se"></td>' +
-      '<td class="calc" data-c="hi"></td>' +
       '<td><button class="del" data-del="'+i+'" aria-label="この行を削除">×</button></td>';
     tb.appendChild(tr);
   });
@@ -726,15 +711,11 @@ function refreshTable(c){
     t.querySelector('[data-c="note"]').textContent = r.note || "";
     t.querySelector('[data-c="std"]').textContent  = (r.std == null) ? "–" : n1(r.std);
     t.querySelector('[data-c="tot"]').textContent  = n1(r.totalFte);
-    t.querySelector('[data-c="se"]').textContent   = (r.n  > 0) ? n1(r.salarySe) : "–";
-    t.querySelector('[data-c="hi"]').textContent   = (r.hi > 0) ? n1(r.salaryHi) : "–";
   }
   $("f-std").textContent   = n1(c.stdN);
-  $("f-nbase").textContent = n1(c.baseS);
-  $("f-hi").textContent    = n1(c.baseH);
+  $("f-nbase").textContent = n1(c.nSe);
+  $("f-hi").textContent    = n1(c.nHi);
   $("f-n").textContent     = n1(c.n);
-  $("f-a").textContent     = c.nSe > 0 ? n1(c.avgSe) : "–";
-  $("f-e").textContent     = c.nHi > 0 ? n1(c.avgHi) : "–";
 }
 
 /* ---------- 数値パネル ---------- */
@@ -772,8 +753,6 @@ function renderRatio(c){
            '</span><span class="s">万円　月例給 '+yen(c.avg*10000/(12+c.bonus))+'</span></div>';
   cells += '<div class="cell"><span class="k">1人あたり人件費</span><span class="v">'+n1(c.perHead)+
            '</span><span class="s">万円　事業主負担 '+c.fuku+'％ 込み</span></div>';
-  cells += '<div class="cell"><span class="k">賃金倍率</span><span class="v">×'+c.k.toFixed(3)+
-           '</span><span class="s">基準年収 × この倍率 ＝ 正規年収</span></div>';
   cells += '<div class="cell"><span class="k">正規比率</span><span class="v">'+(100-c.hiRate).toFixed(0)+
            ' ％</span><span class="s">常勤換算ベース（非正規 '+n1(c.nHi)+' 人）</span></div>';
   if (r && c.coreN > 0 && c.users > 0){
@@ -968,7 +947,6 @@ function makeText(c){
   if (isFinite(c.nMinComp)) L.push("　いまの構成で基準を満たす最小合計：" + n1(c.nMinComp) + " 人");
   L.push("平均年収（額面）：" + n1(c.avg) + " 万円／月例給 " + yen(c.avg*10000/(12+c.bonus)) + "（賞与 " + c.bonus + "ヶ月換算）");
   L.push("1人あたり人件費（事業主負担込み）：" + n1(c.perHead) + " 万円");
-  L.push("賃金倍率：×" + c.k.toFixed(3) + "（基準年収に対する実水準）");
   L.push("");
   L.push("雇用区分：正規 " + n1(c.nSe) + " 人／非正規 " + n1(c.nHi) + " 人（正規比率 " + (100-c.hiRate).toFixed(1) + "％）");
   if (c.nSe > 0) L.push("　正規 平均年収 " + n1(c.avgSe) + " 万円／月例給 " + yen(c.avgSe*10000/(12+c.bonus)));
@@ -1071,7 +1049,7 @@ document.addEventListener("click", function(e){
     buildTable(); update(); return;
   }
   if (t.id === "add"){
-    rows.push({key:"custom"+rows.length, name:"追加した職種", note:"手入力", n:1, hi:0, a:400});
+    rows.push({key:"custom"+rows.length, name:"追加した職種", note:"手入力", n:1, hi:0});
     buildTable(); update(); return;
   }
   if (t.id === "reset-roles"){
@@ -1087,15 +1065,6 @@ document.addEventListener("click", function(e){
       if (tot < need) r.n = Math.ceil((r.n + (need - tot)) * 10) / 10;
     });
     buildTable(); update(); return;
-  }
-  if (t.id === "fit-wage"){
-    c = update();
-    var Bs = 0, Bh = 0;
-    c.rows.forEach(function(r){ Bs += r.n * r.a; Bh += r.hi * r.a * c.hw; });
-    var needTotal = (Bs + Bh) * scale * (1 + c.fuku/100);
-    if (mode === "direct") $("total").value = Math.round(needTotal);
-    else if (c.rev > 0) $("ratio").value = Math.round(needTotal / c.rev * 1000) / 10;
-    update(); return;
   }
   if (t.id === "use-std"){ nminTouched = false; update(); return; }
   if (t.id === "mk"){ var o = $("out"); o.hidden = false; o.value = makeText(update()); o.select(); return; }

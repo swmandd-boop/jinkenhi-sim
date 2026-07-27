@@ -171,8 +171,7 @@ var SERVICES = {
         note: (noteMap[r.key] != null ? noteMap[r.key] : r.note),
         std:  (stdMap[r.key]  != null ? stdMap[r.key]  : null),
         n:  Math.max(0, r.n  || 0),
-        hi: Math.max(0, r.hi || 0),
-        a:  Math.max(0, r.a  || 0)
+        hi: Math.max(0, r.hi || 0)
       };
     });
 
@@ -183,24 +182,23 @@ var SERVICES = {
     var total = (I.mode === "ratio") ? rev * I.ratio / 100 : I.total;
     var pool  = total / (1 + I.fuku / 100);
 
-    /* 人数と賃金 */
-    var baseS = 0, baseH = 0, stdN = 0, Bs = 0, Bh = 0;
+    /* 人数と賃金
+       v0.4: 職種別の基準年収を廃止。給与原資 pool を全員に均一に配り、非正規は
+       正規の hw 倍とする。avgSe*(nSe+hw*nHi)=pool を満たす avgSe が正規の平均年収。
+       職種間の配分（v0.3 の賃金倍率 k）は主題（総額は配分に依らない）と無関係なため削除。 */
+    var baseS = 0, baseH = 0, stdN = 0;
     rows.forEach(function(r){
       baseS += r.n; baseH += r.hi; stdN += (r.std || 0);
-      Bs += r.n * r.a; Bh += r.hi * r.a * hw;
     });
-    var baseN = baseS + baseH, baseW = Bs + Bh;
-    var k    = baseW > 0 ? pool / (baseW * scale) : 0;
+    var baseN = baseS + baseH;
     var n    = baseN * scale, nSe = baseS * scale, nHi = baseH * scale;
     var avg   = n   > 0 ? pool / n : 0;
-    var avgSe = nSe > 0 ? k * Bs * scale / nSe : 0;
-    var avgHi = nHi > 0 ? k * Bh * scale / nHi : 0;
+    var wUnits = nSe + hw * nHi;                 // 正規換算の重み合計
+    var avgSe = wUnits > 0 ? pool / wUnits : 0;  // 正規の平均年収
+    var avgHi = avgSe * hw;                       // 非正規の平均年収
 
     rows.forEach(function(r){
       r.totalFte  = (r.n + r.hi) * scale;
-      r.salarySe  = r.a * k;
-      r.salaryHi  = r.a * hw * k;
-      r.monthlySe = r.salarySe * 10000 / (12 + I.bonus);
     });
 
     /* 職種別の基準充足 */
@@ -239,14 +237,12 @@ var SERVICES = {
     var up = 10, f1 = 1 + I.fuku / 100;
     var needMoreTotal = n * up * f1;
     var hiNow = n > 0 ? nHi / n : 0, hiNew = Math.min(1, hiNow + 0.10);
-    var Cnow = (1 - hiNow) * f1 + hiNow * hw * f1;
-    var Cnew = (1 - hiNew) * f1 + hiNew * hw * f1;
-    var abar  = baseN > 0 ? (Bs + (hw ? Bh / hw : 0)) / baseN : 0;
-    var dB    = (hiNew - hiNow) * baseN * abar;
-    var Bs2 = Bs - dB, Bh2 = Bh + dB * hw;
-    var pool2 = total / f1;
-    var k2 = (Bs2 + Bh2) > 0 ? pool2 / ((Bs2 + Bh2) * scale) : 0;
-    var nSe2 = n * (1 - hiNew);
+    /* 非正規率を +10pt したときの重み係数（正規換算1人あたりコスト）。基準年収に依らない。 */
+    var Cnow = (1 - hiNow) + hiNow * hw;
+    var Cnew = (1 - hiNew) + hiNew * hw;
+    /* 人数を保ったまま非正規率を上げたときの正規平均年収（新式）。 */
+    var wUnits2 = n * ((1 - hiNew) + hw * hiNew);
+    var avgSe2  = wUnits2 > 0 ? pool / wUnits2 : 0;
     var marg = {
       perPerson: n > 0 ? pool / n - pool / (n + 1) : 0,
       needMoreTotal: needMoreTotal,
@@ -255,14 +251,14 @@ var SERVICES = {
       revUp: I.ratio > 0 ? needMoreTotal / (I.ratio / 100) : 0,
       hiNow: hiNow * 100, hiNew: hiNew * 100,
       dN: Cnew > 0 ? n * (Cnow / Cnew - 1) : 0,
-      dAvgSe: nSe2 > 0 ? (k2 * Bs2 * scale / nSe2) - avgSe : 0
+      dAvgSe: avgSe2 - avgSe
     };
 
     return {
       service:I.service, svcName:svc.name, svc:svc, sizes:I.sizes, week:I.week,
       mode:I.mode, autoRev:I.autoRev, price:I.price, scale:scale,
       fuku:I.fuku, bonus:I.bonus, hw:hw, ratioIn:I.ratio, atgt:I.atgt,
-      rev:rev, total:total, pool:pool, effRatio:effRatio, k:k,
+      rev:rev, total:total, pool:pool, effRatio:effRatio,
       rows:rows, baseS:baseS, baseH:baseH, baseN:baseN, stdN:stdN,
       n:n, nSe:nSe, nHi:nHi, hiRate: n > 0 ? nHi / n * 100 : 0,
       avg:avg, avgSe:avgSe, avgHi:avgHi, perHead: avg * (1 + I.fuku / 100),
@@ -284,7 +280,7 @@ var SERVICES = {
   function initialRows(svcKey, sizes, week){
     return buildStandard(svcKey, sizes, week).map(function(r){
       return { key:r.key, name:r.name, note:r.note,
-               n: Math.ceil((r.std || 0) * 10 - 1e-9) / 10, hi:0, a:r.a };
+               n: Math.ceil((r.std || 0) * 10 - 1e-9) / 10, hi:0 };
     });
   }
 

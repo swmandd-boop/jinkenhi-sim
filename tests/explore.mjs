@@ -2,7 +2,7 @@
 /* ランダム入力での探索テスト。dayservice-sim の 10,000 ケース探索と同じ考え方で、
    不変条件を破る入力を機械に探させる。失敗したら再現用の入力をそのまま出力する。 */
 import { SERVICES, initialRows, calcState } from "../engine.mjs";
-import { DEFAULT_SIZES, near, fillStd, fitWage } from "./helpers.mjs";
+import { DEFAULT_SIZES, near, fillStd } from "./helpers.mjs";
 
 const N = Number(process.argv[2] ?? 10000);
 const SEED = Number(process.argv[3] ?? 20260726);
@@ -28,8 +28,7 @@ function randomInput() {
   const rows = initialRows(service, sizes, week).map(r => ({
     ...r,
     n:  Math.max(0, Math.round(r.n * between(0, 2.2) * 10) / 10),
-    hi: Math.round(between(0, 8) * 10) / 10,
-    a:  Math.round(between(200, 900))
+    hi: Math.round(between(0, 8) * 10) / 10
   }));
   return {
     service, sizes, week,
@@ -53,7 +52,7 @@ function randomInput() {
 const CHECKS = [
   ["合計が正規＋非正規と一致", (c) => near(c.baseS + c.baseH, c.baseN) && near(c.nSe + c.nHi, c.n)],
   ["数値にNaNがない", (c) => Object.values(c).every(v => typeof v !== "number" || !Number.isNaN(v))
-      && c.rows.every(r => ["totalFte","salarySe","salaryHi","monthlySe"].every(k => !Number.isNaN(r[k])))],
+      && c.rows.every(r => !Number.isNaN(r.totalFte))],
   ["人数×平均年収＝給与原資", (c) => near(c.n * c.avg, c.pool, 1e-8)],
   ["給与原資×(1+負担率)＝人件費総額", (c, I) => near(c.pool * (1 + I.fuku / 100), c.total)],
   ["未達なしなら全職種で基準以上", (c) => c.shorts.length > 0 || c.blocked
@@ -62,7 +61,7 @@ const CHECKS = [
       const r = c.rows.find(y => y.name === x.name); return r && r.totalFte < r.std - 1e-9; })],
   ["配置比率の分母は正規＋非正規", (c) => !c.svc.ratio || near(c.coreN,
       c.rows.filter(r => c.svc.ratio.roles.includes(r.key)).reduce((a, r) => a + r.totalFte, 0))],
-  ["非正規年収＝正規年収×賃金水準", (c) => c.rows.every(r => near(r.salaryHi, r.salarySe * c.hw))],
+  ["非正規平均＝正規平均×賃金水準", (c) => c.nHi <= 0 || near(c.avgHi, c.avgSe * c.hw, 1e-9)],
   ["構成考慮の下限≧基準の単純合計", (c) => !isFinite(c.nMinComp) || c.nMinComp >= c.stdN - 1e-9],
   ["成立判定が下限と上限に整合", (c) => c.feasible === (c.nmin <= c.nCap + 1e-9)],
   ["スケールで給与原資が変わらない", (c, I) => near(calcState({ ...I, scale: I.scale * 1.37 }).pool, c.pool)],
@@ -71,8 +70,7 @@ const CHECKS = [
       const d = calcState({ ...I, rows });
       return near(d.pool, c.pool) && near(d.total, c.total) && near(d.n, c.n); }],
   ["不足を埋めると未達が解消", (c, I) => calcState(fillStd(I)).shorts.length === 0 || !!c.blocked],
-  ["入力どおりにすると倍率が1", (c, I) => { const d = calcState(fitWage(I));
-      return d.k === 0 || near(d.k, 1, 1e-5) || !isFinite(d.k); }]
+  ["正規payroll＋非正規payroll＝給与原資", (c) => near(c.nSe * c.avgSe + c.nHi * c.avgHi, c.pool, 1e-8)]
 ];
 
 let fails = 0;
