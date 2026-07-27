@@ -45,6 +45,7 @@ function randomInput() {
     nminAuto: rnd() < 0.6,
     nminManual: Math.round(between(0, 120) * 10) / 10,
     atgt: Math.round(between(0, 900)),
+    g: Math.round(between(0, 10) * 10) / 10,
     rows
   };
 }
@@ -52,7 +53,9 @@ function randomInput() {
 const CHECKS = [
   ["合計が正規＋非正規と一致", (c) => near(c.baseS + c.baseH, c.baseN) && near(c.nSe + c.nHi, c.n)],
   ["数値にNaNがない", (c) => Object.values(c).every(v => typeof v !== "number" || !Number.isNaN(v))
-      && c.rows.every(r => !Number.isNaN(r.totalFte))],
+      && c.rows.every(r => !Number.isNaN(r.totalFte))
+      && c.proj.horizons.every(x => Number.isFinite(x.ratio) && Number.isFinite(x.delta))
+      && ["delta","revUp","rate","cutN"].every(k => Number.isFinite(c.proj.absorb[k]))],
   ["人数×平均年収＝給与原資", (c) => near(c.n * c.avg, c.pool, 1e-8)],
   ["給与原資×(1+負担率)＝人件費総額", (c, I) => near(c.pool * (1 + I.fuku / 100), c.total)],
   ["未達なしなら全職種で基準以上", (c) => c.shorts.length > 0 || c.blocked

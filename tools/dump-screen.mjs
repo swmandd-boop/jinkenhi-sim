@@ -41,12 +41,18 @@ function snapshot(title) {
   L.push(d.getElementById("compliance").textContent.replace(/\s+/g, " ").trim());
   L.push("-- 成立判定 --");
   L.push(d.getElementById("verdict").textContent.replace(/\s+/g, " ").trim());
+  L.push("-- 必要人件費率 --");
+  L.push(d.getElementById("need-ratio").textContent.replace(/\s+/g, " ").trim());
+  L.push("-- 定点の位置づけ --");
+  L.push(d.getElementById("anchor").textContent.replace(/\s+/g, " ").trim());
   L.push("-- 雇用区分 --");
   for (const r of d.querySelectorAll("#emp-readout .row"))
     L.push(`${r.querySelector(".k").textContent.trim()} = ${r.querySelector(".v").textContent.trim()}`);
   L.push("-- 限界トレードオフ --");
   for (const r of d.querySelectorAll("#marginal .row"))
     L.push(`${r.querySelector(".k").textContent.trim()} = ${r.querySelector(".v").textContent.trim()}`);
+  L.push("-- 推移 --");
+  L.push(d.getElementById("trend").textContent.replace(/\s+/g, " ").trim());
   L.push("-- 職種別の内訳 --");
   const th = [...d.querySelectorAll("#tbl thead th")].map(x => x.textContent.replace(/\s+/g, "")).filter(Boolean);
   L.push(th.join(" | "));
@@ -109,7 +115,9 @@ shots.push(snapshot("12 老健に切り替え"));
 
 selectService("tsuusho");
 setVal("sz-days", 5);
-shots.push(snapshot("13 通所介護・週5日営業"));
+setVal("atgt", 420);   // 下回れない平均年収を入力（賃金の余裕を表示）
+setVal("g", 2.0);      // 人件費の年間上昇率2.0%で推移を動かす
+shots.push(snapshot("13 通所介護・週5日／平均年収下限420・年上昇率2.0%"));
 
 click("mk");
 shots.push("===== 14 書き出しテキスト =====\n" + d.getElementById("out").value);

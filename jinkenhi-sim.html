@@ -194,6 +194,11 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
         <p class="hint">地域相場、または現在の平均年収を入れます。ここを下げれば人は増やせます。</p>
       </div>
       <div class="field">
+        <label for="g">人件費の年間上昇率（推移の計算用）</label>
+        <div class="inline"><input type="number" id="g" value="0.0" step="0.1" min="0"><span class="unit">％</span></div>
+        <p class="hint">2期分の決算から「人件費総額 ÷ 常勤換算数」の伸び率を計算して入れます。定期昇給・昇格に加えて、退職と新規採用による入れ替えの効果も含んだ実績値になります。<b>既定は0.0％で、入れて初めて推移が動きます。</b></p>
+      </div>
+      <div class="field">
         <label for="week">常勤の週所定労働時間（常勤換算の分母）</label>
         <div class="inline"><input type="number" id="week" value="40" step="0.5" min="1"><span class="unit">時間</span></div>
       </div>
@@ -227,6 +232,11 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
     <section class="panel">
       <h2>いま動かすと何が起きるか<span class="tag">限界トレードオフ</span></h2>
       <div id="marginal"></div>
+    </section>
+
+    <section class="panel">
+      <h2>このまま進むと<span class="tag">推移</span></h2>
+      <div id="trend"></div>
     </section>
 
     <section class="panel">
@@ -573,6 +583,26 @@ var SERVICES = {
     var gapRev  = (rev > 0 && I.ratio > 0) ? needRevV - rev : 0; // 収入をいくら増やすか
     var gapCutN = isFinite(nCap) ? n - nCap : 0;       // 常勤換算を何人減らすか
 
+    /* 推移（新機能C）: 現行の賃金カーブ（1人あたり人件費の年上昇率 g）を維持した場合の
+       人件費率の推移。介護報酬改定・処遇改善加算改定・稼働率の将来変動は織り込まない。 */
+    var g = (I.g || 0) / 100;
+    function grow(t){ return Math.pow(1 + g, t); }
+    var horizons = [3, 5, 10].map(function(t){
+      var f = grow(t);
+      return { t: t, ratio: effRatio * f, delta: total * (f - 1) };
+    });
+    var absorbT = 5, fA = grow(absorbT), deltaA = total * (fA - 1);
+    var proj = {
+      g: I.g || 0,
+      horizons: horizons,
+      absorb: {
+        t: absorbT, delta: deltaA,
+        revUp: rev > 0 ? rev * (fA - 1) : 0,   // 収入を増やす（年率 g で rev も伸ばす）
+        rate: g * 100,                          // その年率（＝g）
+        cutN: n > 0 ? n * (1 - 1 / fA) : 0      // 常勤換算を減らす（t年後の単価で吸収）
+      }
+    };
+
     /* 限界トレードオフ */
     var up = 10, f1 = 1 + I.fuku / 100;
     var needMoreTotal = n * up * f1;
@@ -611,7 +641,7 @@ var SERVICES = {
       needPool:needPool, needTotal:needTotal, gap: needTotal - total,
       needRatio: needRatioV, needRev: needRevV,
       gapPt: gapPt, gapRev: gapRev, gapCutN: gapCutN,
-      marg:marg
+      proj: proj, marg:marg
     };
   }
 
@@ -674,6 +704,7 @@ function readInputs(){
     price:num("price"), rev:num("rev"), ratio:num("ratio"), total:num("total"),
     fuku:num("fuku"), bonus:num("bonus"), hiW:num("hi-w"),
     scale:scale, nminAuto:!nminTouched, nminManual:num("nmin"), atgt:num("atgt"),
+    g:num("g"),
     rows:rows
   };
 }
@@ -887,6 +918,33 @@ function renderAnchor(c){
   box.innerHTML = h;
 }
 
+/* 新機能C: 推移（§7）。現行の賃金カーブ（年上昇率 g）を維持した場合の人件費率の推移。
+   既定 g=0 では平坦で何も主張しない。介護報酬改定・処遇改善改定・稼働率変動は非計上。 */
+function renderTrend(c){
+  var p = c.proj, h = "";
+  h += "<p class='hint'>現行の賃金カーブ（1人あたり人件費の年上昇率 <b>"+p.g.toFixed(1)+"％</b>）を維持した場合の人件費率の推移です。<b>介護報酬改定・処遇改善加算の改定・稼働率の将来変動は織り込んでいません。</b>収入横ばいは悲観シナリオではなく「制度を変えなければこうなる」という基準線で、報酬改定分は安全余裕になります。</p>";
+  if (!(c.rev > 0)){ h += "<p class='hint'>収益を入れると推移が出ます。</p>"; $("trend").innerHTML = h; return; }
+  var cols = "text-align:right;padding:4px 8px";
+  h += "<table style='width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums'>";
+  h += "<tr><td style='padding:4px 8px'></td><th style='"+cols+"'>3年後</th><th style='"+cols+"'>5年後</th><th style='"+cols+"'>10年後</th></tr>";
+  h += "<tr><td style='padding:4px 8px'>人件費率</td>" +
+       p.horizons.map(function(x){ return "<td style='"+cols+"'>"+pct(x.ratio)+"</td>"; }).join("") + "</tr>";
+  h += "<tr><td style='padding:4px 8px'>人件費の増分</td>" +
+       p.horizons.map(function(x){ return "<td style='"+cols+"'>"+man(x.delta)+"</td>"; }).join("") + "</tr>";
+  h += "</table>";
+  if (p.g > 0){
+    var a = p.absorb;
+    h += "<p style='margin-top:12px'><b>5年後の増分 "+man(a.delta)+" を吸収するには</b></p>";
+    if (c.mode === "ratio" && c.ratioIn > 0)
+      h += "<div class='row'><span class='k'>収入を増やす</span><span class='v'>＋"+man(a.revUp)+"（年率 "+a.rate.toFixed(1)+"％）</span></div>";
+    h += "<div class='row'><span class='k'>常勤換算を減らす</span><span class='v'>−"+n1(a.cutN)+" 人</span></div>";
+    h += "<div class='row'><span class='k'>昇給カーブを抑える</span><span class='v'>年上昇率 "+p.g.toFixed(1)+"％ を下げる</span></div>";
+  } else {
+    h += "<p class='hint'>年間上昇率が 0.0％ のため推移は平坦です。2期分の決算から実績の伸び率を入れると動きます。</p>";
+  }
+  $("trend").innerHTML = h;
+}
+
 function renderMarginal(c){
   var m = c.marg, h = "";
   h += "<div class='row'><span class='k'>常勤換算を1人増やす</span><span class='v'>平均年収 −"+n1(m.perPerson)+" 万円</span></div>";
@@ -1034,7 +1092,7 @@ function update(){
   if (autoRev && mode === "ratio") $("rev").value = Math.round(c.rev);
   if (!nminTouched) $("nmin").value = Math.round(c.nmin * 10) / 10;
   renderNumbers(c); renderEmp(c); renderRatio(c);
-  renderCompliance(c); renderVerdict(c); renderNeedRatio(c); renderAnchor(c); renderMarginal(c); renderChart(c);
+  renderCompliance(c); renderVerdict(c); renderNeedRatio(c); renderAnchor(c); renderMarginal(c); renderTrend(c); renderChart(c);
   return c;
 }
 window.__SWMD_STATE = function(){ return last; };

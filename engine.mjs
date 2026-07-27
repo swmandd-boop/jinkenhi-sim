@@ -241,6 +241,26 @@ var SERVICES = {
     var gapRev  = (rev > 0 && I.ratio > 0) ? needRevV - rev : 0; // 収入をいくら増やすか
     var gapCutN = isFinite(nCap) ? n - nCap : 0;       // 常勤換算を何人減らすか
 
+    /* 推移（新機能C）: 現行の賃金カーブ（1人あたり人件費の年上昇率 g）を維持した場合の
+       人件費率の推移。介護報酬改定・処遇改善加算改定・稼働率の将来変動は織り込まない。 */
+    var g = (I.g || 0) / 100;
+    function grow(t){ return Math.pow(1 + g, t); }
+    var horizons = [3, 5, 10].map(function(t){
+      var f = grow(t);
+      return { t: t, ratio: effRatio * f, delta: total * (f - 1) };
+    });
+    var absorbT = 5, fA = grow(absorbT), deltaA = total * (fA - 1);
+    var proj = {
+      g: I.g || 0,
+      horizons: horizons,
+      absorb: {
+        t: absorbT, delta: deltaA,
+        revUp: rev > 0 ? rev * (fA - 1) : 0,   // 収入を増やす（年率 g で rev も伸ばす）
+        rate: g * 100,                          // その年率（＝g）
+        cutN: n > 0 ? n * (1 - 1 / fA) : 0      // 常勤換算を減らす（t年後の単価で吸収）
+      }
+    };
+
     /* 限界トレードオフ */
     var up = 10, f1 = 1 + I.fuku / 100;
     var needMoreTotal = n * up * f1;
@@ -279,7 +299,7 @@ var SERVICES = {
       needPool:needPool, needTotal:needTotal, gap: needTotal - total,
       needRatio: needRatioV, needRev: needRevV,
       gapPt: gapPt, gapRev: gapRev, gapCutN: gapCutN,
-      marg:marg
+      proj: proj, marg:marg
     };
   }
 

@@ -205,6 +205,48 @@ test("INV-18 gapPt<=0 と feasible が一致（rev>0・atgt>0）", () => {
   }
 });
 
+/* ---- 不変条件19（v0.4新機能C）: 年上昇率0なら推移は定点と一致 ---- */
+test("INV-19 年上昇率0なら全年次で人件費率が定点と一致", () => {
+  for (const s of ALL) {
+    const c = calcState(makeInput(s, { g: 0 }));
+    for (const x of c.proj.horizons) {
+      assert.ok(near(x.ratio, c.effRatio), `${s} t=${x.t}: ${x.ratio} ≠ ${c.effRatio}`);
+      assert.ok(near(x.delta, 0), `${s} t=${x.t} delta=${x.delta}`);
+    }
+  }
+});
+
+/* ---- 不変条件20（v0.4新機能C）: 推移の吸収3択が同じ増分を指す ----
+   注意（設計で一度誤った点）: 人数削減に掛ける単価は t 年後の1人あたり人件費。 */
+test("INV-20 推移の吸収（人員減・収入増）が同じ増分を指す", () => {
+  for (const s of ALL) {
+    for (const g of [1.5, 3, 5]) {
+      const c = calcState(makeInput(s, { g }));
+      const a = c.proj.absorb, f = Math.pow(1 + g / 100, a.t);
+      const delta = c.total * (f - 1);
+      assert.ok(near(a.delta, delta), `${s} g=${g} delta`);
+      if (c.n > 0) {
+        const unitAtT = (c.total / c.n) * f;   // 現在ではなく t 年後の単価
+        assert.ok(near(a.cutN * unitAtT, delta, 1e-6), `${s} g=${g} 人員減ルート`);
+      }
+      if (c.rev > 0) assert.ok(near(a.revUp * (c.effRatio / 100), delta, 1e-6), `${s} g=${g} 収入増ルート`);
+    }
+  }
+});
+
+/* ---- 不変条件21（v0.4）: 職種別人数と規模を固定すれば他の入力で nMinComp は不変 ---- */
+test("INV-21 職種別人数と規模を固定すれば nMinComp は不変", () => {
+  for (const s of ALL) {
+    const base = makeInput(s);
+    const ref = calcState(base).nMinComp;
+    if (!isFinite(ref)) continue;
+    for (const over of [{ g: 5 }, { atgt: 800 }, { fuku: 25 }, { hiW: 120 }, { bonus: 6 }, { ratio: 90 }, { rev: 99999 }, { scale: 1.4 }]) {
+      const c = calcState({ ...base, ...over });
+      assert.ok(near(c.nMinComp, ref), `${s} ${JSON.stringify(over)}: ${c.nMinComp} ≠ ${ref}`);
+    }
+  }
+});
+
 /* ---- 不変条件14: 負の値・ゼロ入力で NaN を出さない ---- */
 test("INV-14 極端な入力でも数値が壊れない", () => {
   const cases = [
