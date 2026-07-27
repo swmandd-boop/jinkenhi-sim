@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>人件費トレードオフ・シミュレーター v0.3 | SWMD</title>
+<title>人件費トレードオフ・シミュレーター v0.4 | SWMD</title>
 <style>
 :root{
   --ink:#101F2B; --ink-2:#4A5C68; --paper:#E4EAEE; --surface:#FBFCFD; --rule:#C5D0D7;
@@ -107,7 +107,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
 <div class="wrap">
 
 <header class="masthead">
-  <div class="eyebrow">SWMD / Personnel Cost Trade-off　v0.3</div>
+  <div class="eyebrow">SWMD / Personnel Cost Trade-off　v0.4</div>
   <h1>人件費トレードオフ・シミュレーター</h1>
   <p class="lede">人件費の原資が決まると、職員数と賃金水準は同時には決められません。「基準どおりの配置」と「払える賃金」がどこでぶつかるのかを、サービス種別の配置基準と突き合わせて確かめます。</p>
 </header>
@@ -1053,7 +1053,7 @@ function renderChart(c){
 /* ---------- 書き出し ---------- */
 function makeText(c){
   var L = [];
-  L.push("【人件費トレードオフ・シミュレーター v0.3】");
+  L.push("【人件費トレードオフ・シミュレーター v0.4】");
   L.push("サービス種別：" + c.svcName);
   c.svc.fields.forEach(function(f){ L.push("　" + f.label + "：" + sizes[f.k] + f.unit); });
   L.push("");
