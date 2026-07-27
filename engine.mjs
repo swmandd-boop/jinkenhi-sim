@@ -317,13 +317,18 @@ var SERVICES = {
   /* 職員数スライダーの倍率を実配置（正規・非正規）に書き戻す。
      scale を残して未スケール値（入力列）とスケール後の値（合計列）を同時に
      画面へ出すと「正規計＋非正規計 ≠ 合計」の矛盾になるため、離した時点で
-     ここに畳んで scale を 1 に戻す。常勤換算の粒度に合わせ 0.1 人単位で丸める。 */
+     ここに畳んで scale を 1 に戻す。
+     ★丸めない（比例配分をそのまま保持する）。0.1 単位に丸めると、小さい行が
+       相対的に切り上がり大きい行が切り下がって職種構成が崩れ、ドラッグを重ねるほど
+       配置下限 nMinComp が押し上がる（往復・複数回で顕著）。丸めないことで
+       各行の構成比・nMinComp を厳密に保つ。per-row の 正規＋非正規＝合計 は
+       n*s + hi*s = (n+hi)*s で厳密に成立する。 */
   function scaleRows(rows, scale){
     var s = (scale > 0) ? scale : 1;
     return rows.map(function(r){
       var o = {}; for (var k in r) o[k] = r[k];
-      o.n  = Math.round((r.n  || 0) * s * 10) / 10;
-      o.hi = Math.round((r.hi || 0) * s * 10) / 10;
+      o.n  = (r.n  || 0) * s;
+      o.hi = (r.hi || 0) * s;
       return o;
     });
   }

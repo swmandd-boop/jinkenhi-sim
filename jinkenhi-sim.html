@@ -72,14 +72,14 @@ svg{display:block;width:100%;height:auto;touch-action:none;cursor:ew-resize}
 .verdict p:last-child{margin-bottom:0}
 .verdict ul{margin:8px 0 0;padding-left:1.1em;font-size:13.5px}
 b.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
-table{width:100%;min-width:780px;border-collapse:collapse;font-size:13px}
-th,td{padding:6px 5px;border-bottom:1px solid var(--rule);text-align:right;vertical-align:middle}
+table{width:33.5em;table-layout:fixed;border-collapse:collapse;font-size:13px}
+th,td{padding:6px 4px;border-bottom:1px solid var(--rule);text-align:right;vertical-align:middle}
 th{font-size:11px;font-weight:500;color:var(--ink-2);letter-spacing:.04em;white-space:nowrap}
-th:first-child,td:first-child{text-align:left}
-td.calc{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+th:first-child,td:first-child{text-align:left;padding-left:2px}
+td.calc{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 td.std{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ai);white-space:nowrap}
 tfoot td{font-weight:600;border-bottom:0;border-top:2px solid var(--ink)}
-table input{padding:5px 4px;font-size:13px;min-width:0}
+table input{padding:5px 4px;font-size:13px;width:100%;box-sizing:border-box}
 table input[type=number]{-moz-appearance:textfield}
 table input[type=number]::-webkit-outer-spin-button,
 table input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
@@ -250,12 +250,12 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
       <table id="tbl">
         <thead>
           <tr>
-            <th style="min-width:10em">職種</th>
-            <th style="width:4.4em">基準<br>常勤換算</th>
-            <th style="width:5em">正規<br>常勤換算</th>
-            <th style="width:5.4em">非正規<br>常勤換算</th>
-            <th style="width:5em">合計<br>常勤換算</th>
-            <th style="width:2em"></th>
+            <th style="width:11em">職種</th>
+            <th style="width:4.5em">基準<br>常勤換算</th>
+            <th style="width:5.2em">正規<br>常勤換算</th>
+            <th style="width:5.2em">非正規<br>常勤換算</th>
+            <th style="width:6em">合計<br>常勤換算</th>
+            <th style="width:1.6em"></th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -662,13 +662,18 @@ var SERVICES = {
   /* 職員数スライダーの倍率を実配置（正規・非正規）に書き戻す。
      scale を残して未スケール値（入力列）とスケール後の値（合計列）を同時に
      画面へ出すと「正規計＋非正規計 ≠ 合計」の矛盾になるため、離した時点で
-     ここに畳んで scale を 1 に戻す。常勤換算の粒度に合わせ 0.1 人単位で丸める。 */
+     ここに畳んで scale を 1 に戻す。
+     ★丸めない（比例配分をそのまま保持する）。0.1 単位に丸めると、小さい行が
+       相対的に切り上がり大きい行が切り下がって職種構成が崩れ、ドラッグを重ねるほど
+       配置下限 nMinComp が押し上がる（往復・複数回で顕著）。丸めないことで
+       各行の構成比・nMinComp を厳密に保つ。per-row の 正規＋非正規＝合計 は
+       n*s + hi*s = (n+hi)*s で厳密に成立する。 */
   function scaleRows(rows, scale){
     var s = (scale > 0) ? scale : 1;
     return rows.map(function(r){
       var o = {}; for (var k in r) o[k] = r[k];
-      o.n  = Math.round((r.n  || 0) * s * 10) / 10;
-      o.hi = Math.round((r.hi || 0) * s * 10) / 10;
+      o.n  = (r.n  || 0) * s;
+      o.hi = (r.hi || 0) * s;
       return o;
     });
   }
@@ -695,6 +700,11 @@ var $ = function(id){ return document.getElementById(id); };
 var num = function(id){ var v = parseFloat($(id).value); return isFinite(v) ? v : 0; };
 function man(v){ return v.toLocaleString("ja-JP",{maximumFractionDigits:0}) + " 万円"; }
 function n1(v){ return (Math.round(v*10)/10).toLocaleString("ja-JP",{minimumFractionDigits:1,maximumFractionDigits:1}); }
+/* 入力欄の表示用。スライダー確定（比例配分）で生じる満精度の値を、合計列（n1・0.1単位）と
+   同じ 0.1 単位に丸めて短く・欠けずに表示する。実配置 rows 自体は満精度のまま保持するので
+   職種構成比・nMinComp は厳密に保たれる（これは value 文字列の見た目だけを整える）。
+   カンマ区切りは number 入力に入れられないため使わない。 */
+function fmtN(v){ return String(Math.round((v || 0) * 10) / 10); }
 function n2(v){ return (Math.round(v*100)/100).toFixed(2); }
 function yen(v){ return Math.round(v).toLocaleString("ja-JP") + " 円"; }
 function pct(v){ return v.toFixed(1) + " ％"; }
@@ -742,8 +752,8 @@ function buildTable(){
     tr.innerHTML =
       '<td><span class="rolename">'+r.name+'</span><span class="rolenote" data-c="note"></span></td>' +
       '<td class="std" data-c="std"></td>' +
-      '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="n" value="'+r.n+'"></td>' +
-      '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="hi" value="'+(r.hi||0)+'"></td>' +
+      '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="n" value="'+fmtN(r.n)+'"></td>' +
+      '<td><input type="number" step="0.1" min="0" data-i="'+i+'" data-f="hi" value="'+fmtN(r.hi||0)+'"></td>' +
       '<td class="calc" data-c="tot"></td>' +
       '<td><button class="del" data-del="'+i+'" aria-label="この行を削除">×</button></td>';
     tb.appendChild(tr);

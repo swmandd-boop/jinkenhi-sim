@@ -150,6 +150,35 @@ test("UI-08 定点の位置づけ：起動時は基準ちょうど警告＋賃�
   assert.ok(anchor().includes("賃金の余裕"), `atgt入力後に賃金余裕を出していない: ${anchor()}`);
 });
 
+/* 敵対的レビュー後の回帰: ⑤の書き戻し（0.1丸め）で職種構成が崩れ、ドラッグを重ねるほど
+   配置下限 nMinComp が押し上がっていた（往復・複数回で顕著）。丸めをやめ比例配分を厳密化。
+   ドラッグ確定の前後で nMinComp と各行の構成比が保たれることを固定する。
+   INV-21 は「職種別人数を固定したまま」の条件でスライダーを覆っていなかった。 */
+function stateOf(t){ return t.d.defaultView.__SWMD_STATE(); }
+function slideCommit(t, v){
+  const el = t.d.getElementById("scale"), Ev = t.d.defaultView.Event;
+  el.value = String(v);
+  el.dispatchEvent(new Ev("input", { bubbles: true }));
+  el.dispatchEvent(new Ev("change", { bubbles: true }));   // 離して確定
+}
+function compOf(c){ return c.rows.map(r => c.baseN > 0 ? (r.n + r.hi) / c.baseN : 0); }
+
+test("UI-10 スライダー確定でも nMinComp と職種構成比が保たれる（単発・往復・複数回）", () => {
+  const t = open();
+  t.row(8, "n", 3); t.row(9, "n", 2);   // 非核の行を足して崩れやすくする
+  const base = stateOf(t);
+  const nmc0 = base.nMinComp, comp0 = compOf(base);
+  const check = (tag) => {
+    const c = stateOf(t);
+    assert.ok(Math.abs(c.nMinComp - nmc0) < 1e-6, `${tag}: nMinComp ${c.nMinComp} ≠ ${nmc0}`);
+    compOf(c).forEach((r, i) => assert.ok(Math.abs(r - comp0[i]) < 1e-6, `${tag}: 構成比[${i}] ${r} ≠ ${comp0[i]}`));
+  };
+  slideCommit(t, 1.8); check("×1.8");            // 単発（上げ）
+  slideCommit(t, 0.4); check("×0.4");            // 単発（下げ）
+  slideCommit(t, 1.5); slideCommit(t, 1 / 1.5); check("往復（×1.5→×1/1.5）");
+  for (const s of [0.5, 1.8, 0.7, 1.3, 0.6, 1.8]) { slideCommit(t, s); check(`複数回 s=${s}`); }
+});
+
 /* 新機能A（§5）の表示条件を §6 に揃える：必要人件費率は nmin×atgt で計算するため、
    下回れない平均年収が未入力（初期値のまま）だとサンプル値を根拠にした診断になる。
    よって atgt 未入力なら数値を出さず入力を促す。§5と§6で片方だけ出る状態を作らない。 */
