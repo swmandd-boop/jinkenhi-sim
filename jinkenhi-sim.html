@@ -227,10 +227,9 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
 
     <section class="panel">
       <h2>職種別の内訳<span class="tag">STEP 5</span></h2>
-      <p class="hint" style="margin:-6px 0 10px"><b>正規・非正規は、それぞれの常勤換算をそのまま入れてください</b>（内数ではありません）。合計が「基準」以上かどうかで充足を判定します。初期値は正規に基準どおりの人数、非正規は0人です。基準のない職種（事務・調理など）は0人から始まります。加算要件・自治体条例で必要数は変わります。<br>
-      <b>兼務している職員は、常勤換算で按分して入力してください</b>（例：看護師0.8・機能訓練指導員0.2）。このツールは兼務の判定を行わず、入力された常勤換算をそのまま基準と突き合わせます。<br>
-      <b>平均年収の出し方：</b>給与原資を人数で割った額面です。職種ごとの賃金差は入れていません（総額は職種間の配分に依らないため）。<b>雇用区分：</b>正規の平均年収に対し、非正規は STEP4 の賃金水準（既定70％）を掛けた額です。同じ原資でも比率を変えれば、置ける人数か正規の賃金のどちらかが動きます。<br>
-      <b>金額の基準：</b>年収・月例給は<b>額面</b>で、事業主負担の法定福利費は含みません。賃金センサスや求人票の提示年収と同じ土俵の数字です。</p>
+      <p class="hint" style="margin:-6px 0 10px"><b>正規・非正規は、それぞれの常勤換算をそのまま入れてください</b>（内数ではありません）。合計が「基準」以上かどうかで職種別に充足を判定します。<br>
+      <b>兼務している職員は、常勤換算で按分して入力してください</b>（例：看護師0.8・機能訓練指導員0.2）。ツールは兼務の判定をしません。<br>
+      <span style="color:var(--ink-2)">平均年収の出し方・金額の範囲（額面かどうか等）は、ページ下部の「前提と出典の扱い」に載せています。</span></p>
       <div class="tbl-scroll">
       <table id="tbl">
         <thead>
@@ -921,13 +920,14 @@ function renderTrend(c){
   var p = c.proj, h = "";
   h += "<p class='hint'>現行の賃金カーブ（1人あたり人件費の年上昇率 <b>"+p.g.toFixed(1)+"％</b>）を維持した場合の人件費率の推移です。<b>介護報酬改定・処遇改善加算の改定・稼働率の将来変動は織り込んでいません。</b>収入横ばいは悲観シナリオではなく「制度を変えなければこうなる」という基準線で、報酬改定分は安全余裕になります。</p>";
   if (!(c.rev > 0)){ h += "<p class='hint'>収益を入れると推移が出ます。</p>"; $("trend").innerHTML = h; return; }
-  var cols = "text-align:right;padding:4px 8px";
-  h += "<table style='width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums'>";
-  h += "<tr><td style='padding:4px 8px'></td><th style='"+cols+"'>3年後</th><th style='"+cols+"'>5年後</th><th style='"+cols+"'>10年後</th></tr>";
+  var cols = "text-align:right;padding:4px 8px", sp = "<td data-c='trend-sp' style='width:8%'></td>";
+  h += "<table style='width:100%;table-layout:fixed;border-collapse:collapse;font-variant-numeric:tabular-nums'>";
+  h += "<tr><td style='padding:4px 8px;width:30%'></td><th style='"+cols+";width:20%'>3年後</th>" +
+       "<th style='"+cols+";width:20%'>5年後</th><th style='"+cols+";width:22%'>10年後</th>"+sp+"</tr>";
   h += "<tr><td style='padding:4px 8px'>人件費率</td>" +
-       p.horizons.map(function(x){ return "<td style='"+cols+"'>"+pct(x.ratio)+"</td>"; }).join("") + "</tr>";
+       p.horizons.map(function(x){ return "<td style='"+cols+"'>"+pct(x.ratio)+"</td>"; }).join("") + sp + "</tr>";
   h += "<tr><td style='padding:4px 8px'>人件費の増分</td>" +
-       p.horizons.map(function(x){ return "<td style='"+cols+"'>"+man(x.delta)+"</td>"; }).join("") + "</tr>";
+       p.horizons.map(function(x){ return "<td style='"+cols+"'>"+man(x.delta)+"</td>"; }).join("") + sp + "</tr>";
   h += "</table>";
   if (p.g > 0){
     var a = p.absorb;

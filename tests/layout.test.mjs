@@ -43,6 +43,7 @@ async function measure(width) {
   return await page.evaluate(() => {
     const fire = (el, t) => el.dispatchEvent(new Event(t, { bubbles: true }));
     const sl = document.getElementById("scale"); sl.value = "1.7"; fire(sl, "input"); // 実配置をスケール
+    const g = document.getElementById("g"); g.value = "2"; fire(g, "input");          // 推移表を出す
     const sc = document.querySelector(".tbl-scroll"), tbl = document.getElementById("tbl");
     const names = [...document.querySelectorAll("#tbody tr td:first-child")].map(td => {
       const n = td.querySelector(".rolename");
@@ -50,11 +51,18 @@ async function measure(width) {
     });
     const inputs = [...document.querySelectorAll('#tbody tr [data-f="n"],#tbody tr [data-f="hi"]')]
       .map(i => ({ v: i.value, over: i.scrollWidth - i.clientWidth }));
+    // 推移表：10年後の値セルの右端が、パネル内側の右端からどれだけ内側にあるか（右余白）
+    const trend = document.getElementById("trend"), tPanel = trend.closest(".panel");
+    const tRows = [...trend.querySelectorAll("table tr")];
+    const yrCellRight = tRows.map(tr => tr.children[3]).filter(Boolean).map(td => td.getBoundingClientRect().right);
+    const tPad = parseFloat(getComputedStyle(tPanel).paddingRight);
+    const panelContentRight = tPanel.getBoundingClientRect().right - tPad;
+    const trendYearRightMargin = yrCellRight.length ? panelContentRight - Math.max(...yrCellRight) : 999;
     return {
       innerWidth: window.innerWidth,
       pageScrollW: document.documentElement.scrollWidth,
       container: sc.clientWidth, table: tbl.offsetWidth, tblScrollW: sc.scrollWidth,
-      names, inputs
+      names, inputs, trendYearRightMargin
     };
   });
 }
@@ -67,6 +75,7 @@ for (const w of [1280, 1440, 1680]) {
     assert.ok(m.container - m.table <= 3, `${w}px: テーブルとコンテナに余白 ${m.container - m.table}px（親幅に追従していない）`);
     assert.ok(m.tblScrollW <= m.container + 1, `${w}px: 標準幅で横スクロールが出ている`);
     assert.ok(m.pageScrollW <= m.innerWidth + 1, `${w}px: ページ本体が横にはみ出している`);
+    assert.ok(m.trendYearRightMargin >= 20, `${w}px: 推移表「10年後」列が右端に張り付いている（右余白 ${m.trendYearRightMargin.toFixed(0)}px）`);
   });
 }
 
