@@ -271,6 +271,8 @@ var SERVICES = {
       n:n, nSe:nSe, nHi:nHi, hiRate: n > 0 ? nHi / n * 100 : 0,
       avg:avg, avgSe:avgSe, avgHi:avgHi, perHead: avg * (1 + I.fuku / 100),
       sMin:sMin, nMinComp:nMinComp, shorts:shorts, blocked:blocked, nmin:nmin,
+      slackN: (isFinite(nMinComp) ? n - nMinComp : Infinity),  // 配置の余裕（人）
+      slackWage: (I.atgt > 0 ? avg / I.atgt : Infinity),        // 賃金の余裕（倍）
       users:users, coreN:coreN, ratioActual:ratioActual, ratioBad:ratioBad,
       nCap:nCap, feasible:feasible,
       okN: n >= nmin - 1e-9, okA: avg >= I.atgt - 1e-9,

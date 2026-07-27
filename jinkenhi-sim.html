@@ -222,6 +222,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
     <div id="compliance" class="verdict"></div>
     <div id="verdict" class="verdict"></div>
     <div id="need-ratio" class="verdict"></div>
+    <div id="anchor" class="verdict"></div>
 
     <section class="panel">
       <h2>いま動かすと何が起きるか<span class="tag">限界トレードオフ</span></h2>
@@ -602,6 +603,8 @@ var SERVICES = {
       n:n, nSe:nSe, nHi:nHi, hiRate: n > 0 ? nHi / n * 100 : 0,
       avg:avg, avgSe:avgSe, avgHi:avgHi, perHead: avg * (1 + I.fuku / 100),
       sMin:sMin, nMinComp:nMinComp, shorts:shorts, blocked:blocked, nmin:nmin,
+      slackN: (isFinite(nMinComp) ? n - nMinComp : Infinity),  // 配置の余裕（人）
+      slackWage: (I.atgt > 0 ? avg / I.atgt : Infinity),        // 賃金の余裕（倍）
       users:users, coreN:coreN, ratioActual:ratioActual, ratioBad:ratioBad,
       nCap:nCap, feasible:feasible,
       okN: n >= nmin - 1e-9, okA: avg >= I.atgt - 1e-9,
@@ -652,7 +655,7 @@ var SERVICES = {
 "use strict";
 
 var S = ENGINE.SERVICES;
-var svcKey = "tokuyou", mode = "ratio", autoRev = true, nminTouched = false;
+var svcKey = "tokuyou", mode = "ratio", autoRev = true, nminTouched = false, atgtTouched = false;
 var scale = 1, sizes = {}, rows = [];
 
 var $ = function(id){ return document.getElementById(id); };
@@ -857,6 +860,33 @@ function renderNeedRatio(c){
   box.innerHTML = h;
 }
 
+/* 新機能B: 定点の位置づけ（§6）。閾値を発明せず、2つの「余裕」で表す。
+   原点はいずれも法人側が決めた線（配置は法令基準、賃金は入力値）。
+   atgt が未入力（初期値のまま）なら賃金側は判定せず入力を促す。 */
+function renderAnchor(c){
+  var box = $("anchor");
+  if (!isFinite(c.nMinComp)){ box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  var sN = c.slackN, tight = Math.abs(sN) < 0.5;
+  var h = "<h3>いまの置き方の位置づけ</h3>";
+  h += "<p>配置の余裕：<b class='num'>" + (sN >= 0 ? "＋" : "−") + n1(Math.abs(sN)) +
+       "</b> 人（職種別基準を満たす最小 " + n1(c.nMinComp) + " 人に対して）</p>";
+  if (atgtTouched){
+    h += "<p>賃金の余裕：<b class='num'>×" + c.slackWage.toFixed(2) +
+         "</b>（下回れない平均年収 " + n1(c.atgt) + " 万円に対する平均年収 " + n1(c.avg) + " 万円）</p>";
+  } else {
+    h += "<p class='hint'>賃金の余裕を見るには「下回れない平均年収」を入れてください（初期値 " +
+         n1(c.atgt) + " 万円はサンプルで、これを基準に診断すると未検証の値が判定基準になってしまいます）。</p>";
+  }
+  if (tight){
+    box.className = "verdict no";
+    h += "<p><b>配置が基準ちょうどです。</b>休暇・欠員・夜勤の変動を吸収する余地がありません。実際の配置人数を入れて確かめてください。</p>";
+  } else {
+    box.className = "verdict";
+  }
+  box.innerHTML = h;
+}
+
 function renderMarginal(c){
   var m = c.marg, h = "";
   h += "<div class='row'><span class='k'>常勤換算を1人増やす</span><span class='v'>平均年収 −"+n1(m.perPerson)+" 万円</span></div>";
@@ -1004,7 +1034,7 @@ function update(){
   if (autoRev && mode === "ratio") $("rev").value = Math.round(c.rev);
   if (!nminTouched) $("nmin").value = Math.round(c.nmin * 10) / 10;
   renderNumbers(c); renderEmp(c); renderRatio(c);
-  renderCompliance(c); renderVerdict(c); renderNeedRatio(c); renderMarginal(c); renderChart(c);
+  renderCompliance(c); renderVerdict(c); renderNeedRatio(c); renderAnchor(c); renderMarginal(c); renderChart(c);
   return c;
 }
 window.__SWMD_STATE = function(){ return last; };
@@ -1072,6 +1102,7 @@ document.addEventListener("input", function(e){
   if (t.id === "scale"){ scale = parseFloat(t.value); update(); return; }
   if (t.id === "auto-rev"){ autoRev = t.checked; applyAutoRev(); update(); return; }
   if (t.id === "nmin"){ nminTouched = true; update(); return; }
+  if (t.id === "atgt"){ atgtTouched = true; update(); return; }
   update();
 });
 

@@ -135,3 +135,17 @@ test("UI-07 スライダー確定で scale が1に戻り、確定前の合計人
   // footer 合計と入力合計も一致
   assert.ok(Math.abs(t.num("f-n") - sum) < 0.05, `footer合計${t.num("f-n")}≠入力合計${sum.toFixed(1)}`);
 });
+
+/* 新機能B（§6）: 定点の位置づけ。起動時（基準ちょうど配置）は警告を出し、
+   下回れない平均年収が未入力なら賃金側の判定を伏せる。敵対的レビュー指摘②への対処。 */
+test("UI-08 定点の位置づけ：起動時は基準ちょうど警告＋賃金余裕は未入力で伏せる", () => {
+  const t = open();
+  const anchor = () => t.txt("#anchor");
+  assert.ok(anchor().includes("配置が基準ちょうど"), `起動時に基準ちょうど警告なし: ${anchor()}`);
+  assert.ok(anchor().includes("賃金の余裕を見るには"), `atgt未入力で賃金余裕を伏せていない: ${anchor()}`);
+  // 下回れない平均年収を入力し、全職種を増員して基準ちょうどから外す
+  t.set("atgt", 450);
+  slide(t, 1.6);
+  assert.ok(!anchor().includes("配置が基準ちょうど"), `増員後も基準ちょうど警告が残る: ${anchor()}`);
+  assert.ok(anchor().includes("賃金の余裕"), `atgt入力後に賃金余裕を出していない: ${anchor()}`);
+});
