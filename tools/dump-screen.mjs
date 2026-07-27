@@ -78,11 +78,11 @@ function snapshot(title) {
 const shots = [];
 shots.push(snapshot("01 起動直後：特養 従来型 80床・実配置＝基準"));
 
-setRow(4, "n", 31); setRow(8, "n", 3); setRow(9, "n", 2);
-shots.push(snapshot("02 介護職員31・調理3・事務2 を入れて実態に寄せる"));
+setRow(0, "n", 31); setRow(2, "n", 6);
+shots.push(snapshot("02 介護職員31・その他6 を入れて実態に寄せる（3行構成）"));
 
-setRow(4, "n", 20); setRow(4, "hi", 11);
-shots.push(snapshot("03 介護職員を正規20／非正規11 に分ける"));
+setRow(0, "n", 20); setRow(0, "hi", 11); setRow(0, "haken", 2); setVal("haken-fee", 1500);
+shots.push(snapshot("03 介護職員を正規20／非正規11／派遣2 に分け、派遣費1,500万を入れる"));
 
 setVal("sz-cap", 100);
 shots.push(snapshot("04 定員だけ100に変更（構成は据え置き＝基準未達が出る想定）"));
@@ -124,7 +124,7 @@ shots.push("===== 14 書き出しテキスト =====\n" + d.getElementById("out")
 mkdirSync(resolve(root, "review"), { recursive: true });
 const out = resolve(root, "review", "screen-dump.txt");
 writeFileSync(out,
-  "SWMD 人件費トレードオフ・シミュレーター v0.3 画面表示値ダンプ\n" +
+  "SWMD 人件費トレードオフ・シミュレーター v0.5 画面表示値ダンプ\n" +
   "adversarial-review モード2（画面矛盾探し）用。codex 側にはこのテキストを渡す。\n" +
   `生成日時: ${new Date().toISOString()}\n\n` + shots.join("\n\n"));
 console.log(`review/screen-dump.txt を生成しました（${shots.length} 場面 / ${shots.join("").length.toLocaleString()} 文字）`);

@@ -49,7 +49,7 @@ async function measure(width) {
       const n = td.querySelector(".rolename");
       return { name: n.textContent, over: n.scrollWidth - td.clientWidth };
     });
-    const inputs = [...document.querySelectorAll('#tbody tr [data-f="n"],#tbody tr [data-f="hi"]')]
+    const inputs = [...document.querySelectorAll('#tbody tr [data-f="n"],#tbody tr [data-f="hi"],#tbody tr [data-f="haken"]')]
       .map(i => ({ v: i.value, over: i.scrollWidth - i.clientWidth }));
     // 推移表：10年後の値セルの右端が、パネル内側の右端からどれだけ内側にあるか（右余白）
     const trend = document.getElementById("trend"), tPanel = trend.closest(".panel");

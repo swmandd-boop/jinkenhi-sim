@@ -17,7 +17,9 @@ export function makeInput(service = "tokuyou", over = {}) {
     service, sizes, week,
     // 収益・人件費総額はともに決算書からの実額入力（既定はサンプル）。人件費率は total/rev で出力。
     rev: svc.defRev, total: Math.round(svc.defRev * svc.bench / 100),
-    fuku: 16.5, bonus: 4, hiW: 70,
+    // v0.5: 人件費総額の内数として派遣職員費を分離。非正規の賃金水準係数(hiW)は廃止（§9）。
+    hakenFee: 0,
+    fuku: 16.5, bonus: 4,
     scale: 1, nminAuto: true, nminManual: 0, atgt: 400,
     rows: initialRows(service, sizes, week)
   };
@@ -34,7 +36,7 @@ export function fillStd(I) {
   const rows = I.rows.map((r, i) => {
     const std = c.rows[i]?.std;
     if (!std || std <= 0) return { ...r };
-    const need = std / (I.scale || 1), tot = r.n + (r.hi || 0);
+    const need = std / (I.scale || 1), tot = r.n + (r.hi || 0) + (r.haken || 0);
     return tot < need ? { ...r, n: Math.ceil((r.n + (need - tot)) * 10) / 10 } : { ...r };
   });
   return { ...I, rows };

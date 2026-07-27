@@ -131,36 +131,17 @@ test("INV-12 成立判定と下限・上限の関係が整合する", () => {
    なり、規模には自動連動しない（規模変更時は収益も見直す、と画面で促す）。
    規模と利用者数の連動そのものは users=cap×occ/100 として INV-14/explore が触れる。 */
 
-/* ---- 不変条件15（v0.4新式）: 正規payroll＋非正規payroll＝給与原資 ---- */
-test("INV-15 正規payroll＋非正規payroll＝給与原資（恒等式）", () => {
+/* ---- 不変条件15（v0.5）: 人件費総額 ＝ 職員給与原資×(1+法定福利費率) ＋ 派遣費 ----
+   v0.4 の「正規payroll＋非正規payroll＝給与原資」を v0.5 の派遣を含む恒等式に更新。
+   金額を正規/非正規で分けない（§9）代わりに、職員給与原資（派遣・法定福利費を除く）に
+   事業主負担を戻し派遣費を足すと人件費総額になる。 */
+test("INV-15 人件費総額＝職員給与原資×(1+法定福利費率)＋派遣費", () => {
   for (const s of ALL) {
-    for (const hw of [0, 0.5, 0.7, 1.3]) {
-      for (const scale of [0.7, 1, 1.3]) {
-        const I = makeInput(s, { hiW: hw * 100, scale });
-        I.rows = I.rows.map(r => ({ ...r, hi: r.n * 0.4, n: r.n * 0.6 }));
-        const c = calcState(I);
-        assert.ok(near(c.nSe * c.avgSe + c.nHi * c.avgHi, c.pool, 1e-9),
-          `${s} hw=${hw} scale=${scale}: ${c.nSe*c.avgSe + c.nHi*c.avgHi} ≠ pool ${c.pool}`);
-      }
-    }
-  }
-});
-
-/* ---- 不変条件16（v0.4新式）: 非正規平均＝正規平均×賃金水準 ----
-   v0.3 は職種別基準年収で加重していたため、非正規が特定職種に偏る（非一様な）
-   混在では成り立たなかった。v0.4 は基準年収を廃し avgSe=pool/(nSe+hw*nHi),
-   avgHi=avgSe*hw に統一するので、偏った配置でも常に成立する。
-   ※ 非正規を偶数行だけに寄せた「非一様」構成でテストする（一様配分だと旧式でも
-     偶然一致してしまい、退行を捕らえられないため）。 */
-test("INV-16 非正規平均は正規平均×賃金水準（新式・偏った混在でも成立）", () => {
-  for (const s of ALL) {
-    for (const hw of [0, 0.5, 0.7, 1.0, 1.3]) {
-      for (const scale of [1, 1.3]) {
-        const I = makeInput(s, { hiW: hw * 100, scale });
-        I.rows = I.rows.map((r, i) => (i % 2 === 0) ? { ...r, hi: r.n * 0.6, n: r.n * 0.4 } : { ...r });
-        const c = calcState(I);
-        if (c.nHi > 0) assert.ok(near(c.avgHi, c.avgSe * hw, 1e-9),
-          `${s} hw=${hw} scale=${scale}: avgHi=${c.avgHi} ≠ avgSe*hw=${c.avgSe*hw}`);
+    for (const fuku of [0, 16.5, 19]) {
+      for (const hakenFee of [0, 1200]) {
+        const c = calcState(makeInput(s, { fuku, hakenFee }));
+        assert.ok(near(c.pool * (1 + fuku / 100) + c.hakenFee, c.total, 1e-9),
+          `${s} fuku=${fuku} 派遣費=${hakenFee}: ${c.pool*(1+fuku/100)+c.hakenFee} ≠ total ${c.total}`);
       }
     }
   }
@@ -184,16 +165,74 @@ test("KANGO-01 看護職員の段階配置は告示の境界で判定する", ()
 /* ---- 敵対的レビュー指摘①: 老健の管理栄養士は入所定員で判定する ----
    基準の文言は「入所定員100以上で1以上」。実利用者数 u（稼働率調整後）で
    判定していたため、定員100・稼働92%（u=92）で基準0.0になり、過少配置を
-   助長していた。判定キーを sz.cap に変更した回帰テスト。 */
-test("RKN-01 老健の管理栄養士は実利用者数でなく入所定員で判定する", () => {
-  for (const occ of [80, 90, 92, 100]) {
-    const c = run("roken", { sizes: { cap: 100, occ } });
-    const eiyou = c.rows.find(r => r.key === "eiyou");
-    assert.ok(eiyou.std >= 1, `定員100・稼働${occ}%: 栄養士 std=${eiyou.std}（1以上のはず）`);
+   助長していた。判定キーを sz.cap に変更した回帰テスト。
+   v0.5: 栄養士は独立行を廃し「その他職員」行に集約した（§1）。栄養士の寄与は
+   その他の std に含まれるため、その他の std を通して 定員判定を検証する。
+   定員100 と 定員99 の差（＝栄養士1）と、定員100 で稼働を落としても
+   その他 std が下がらない（実利用者では判定しない）ことを見る。 */
+test("RKN-01 老健の管理栄養士は実利用者数でなく入所定員で判定する（その他行に集約）", () => {
+  const other = c => c.rows.find(r => r.key === "other").std;
+  const at100 = occ => other(run("roken", { sizes: { cap: 100, occ } }));
+  // 定員100 では稼働を落としても栄養士は消えない（その他 std が一定）
+  const base = at100(100);
+  for (const occ of [80, 90, 92]) {
+    assert.equal(at100(occ), base, `定員100・稼働${occ}%: その他 std=${at100(occ)}（定員100は栄養士を含み一定のはず=${base}）`);
   }
-  const c99 = run("roken", { sizes: { cap: 99, occ: 100 } });
-  const e99 = c99.rows.find(r => r.key === "eiyou");
-  assert.equal(e99.std, 0, `定員99: 栄養士 std=${e99.std}（0のはず）`);
+  // 定員99 では栄養士0 → その他が定員100 より1少ない（他の職種は u=99/100 で不変）
+  const o99 = other(run("roken", { sizes: { cap: 99, occ: 100 } }));
+  assert.ok(near(base - o99, 1, 1e-9), `その他 std 定員100=${base} − 定員99=${o99} は栄養士分の1のはず`);
+});
+
+/* ==== v0.5 段階1（入力構造）で追加する不変条件 ==== */
+
+/* ---- INV-22 分子と分母の整合（§2・§4）----
+   A（1人あたり給与費）は分子=人件費総額・分母=正規＋非正規＋派遣。
+   B（職員1人あたり給与費）は分子=職員給与原資・分母=正規＋非正規（派遣を除く）。
+   派遣がある構成で、A と B の分母・分子がそれぞれ揃っていることを検算する。 */
+test("INV-22 A/B の分子と分母が揃っている（派遣ありでも）", () => {
+  for (const s of ALL) {
+    for (const hakenFee of [0, 800, 2400]) {
+      // 派遣の人数を各行に入れて分母を動かす
+      let I = makeInput(s, { hakenFee });
+      I.rows = I.rows.map(r => ({ ...r, haken: (r.haken || 0) + 1 }));
+      const c = calcState(I);
+      const staffN = c.nSe + c.nHi;             // 正規＋非正規
+      const allN = staffN + c.nHk;              // ＋派遣
+      assert.ok(near(c.A, allN > 0 ? c.total / allN : 0, 1e-9),
+        `${s} 派遣費=${hakenFee}: A=${c.A} ≠ total/(正規+非正規+派遣)=${c.total/allN}`);
+      assert.ok(near(c.B, staffN > 0 ? c.pool / staffN : 0, 1e-9),
+        `${s} 派遣費=${hakenFee}: B=${c.B} ≠ pool/(正規+非正規)=${c.pool/staffN}`);
+    }
+  }
+});
+
+/* ---- INV-23 派遣0のとき A ÷ B ＝ 1 + 法定福利費率（§4）----
+   AとBは基準が違う（A=総額÷全員／B=原資÷職員）。派遣が0なら分母は一致し、
+   分子の差は事業主負担だけになるので比は常に 1+法定福利費率 になる（一致はしない）。 */
+test("INV-23 派遣0のとき A÷B = 1+法定福利費率", () => {
+  for (const s of ALL) {
+    for (const fuku of [0, 16.5, 19]) {
+      const c = calcState(makeInput(s, { fuku, hakenFee: 0 }));
+      assert.ok(c.nHk === 0, `${s}: 既定で派遣人数は0のはず（nHk=${c.nHk}）`);
+      assert.ok(near(c.A / c.B, 1 + fuku / 100, 1e-9),
+        `${s} fuku=${fuku}: A/B=${c.A/c.B} ≠ 1+法定福利費率=${1+fuku/100}`);
+    }
+  }
+});
+
+/* ---- INV-25 初期状態で 基準合計 ＝ 正規合計 が厳密に一致（§6）----
+   v0.4 は基準を各行 CEIL してから正規に入れていたため、基準合計30.7に対し
+   正規合計30.8と0.1ずれた。v0.5 は build 側で std を0.1丸めし、初期正規は
+   その std をそのまま入れる（CEILしない）ので厳密一致する。 */
+test("INV-25 初期状態で 基準合計 = 正規合計（厳密）", () => {
+  for (const s of ALL) {
+    const c = calcState(makeInput(s));
+    const stdSum = c.rows.reduce((a, r) => a + r.std, 0);
+    const regSum = c.rows.reduce((a, r) => a + r.n, 0);
+    assert.ok(near(stdSum, regSum, 1e-12), `${s}: 基準合計=${stdSum} ≠ 正規合計=${regSum}`);
+    assert.equal(c.nHi, 0, `${s}: 初期の非正規は0のはず（nHi=${c.nHi}）`);
+    assert.equal(c.nHk, 0, `${s}: 初期の派遣は0のはず（nHk=${c.nHk}）`);
+  }
 });
 
 /* ---- STEP2 再設計: 人件費率は入力ではなく total/rev の出力である ----

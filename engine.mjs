@@ -12,6 +12,7 @@ var W = {
   eiyou:390, chouri:300, cm:430, ishi:1800, pt:450, yakuzai:600
 };
 var CEIL = function(v){ return Math.ceil(v - 1e-9); };
+var R1   = function(v){ return Math.round(v * 10) / 10; };  // 基準を0.1単位に丸める（初期の基準合計＝正規合計を厳密一致させるため）
 
 /* =========================================================
    サービス種別プリセット
@@ -31,18 +32,13 @@ var SERVICES = {
     build:function(s){
       var u = this.users(s);
       var kango = u <= 30 ? 1 : u <= 50 ? 2 : u <= 130 ? 3 : 3 + CEIL((u - 130) / 50);
-      var core = u / 3, r = u / 80;
+      var core = u / 3, cm100 = Math.max(1, CEIL(u / 100));
+      var other = 1 + 0.1 + cm100 + 1 + cm100 + 1;  // 施設長1・医師0.1・生活相談員・機能訓練1・介護支援専門員・管理栄養士1
       return [
-        {key:"chief", name:"施設長",             std:1,               a:W.chief,  note:"常勤専従1"},
-        {key:"ishi",  name:"医師（嘱託）",        std:0.1,           a:W.ishi,   note:"必要数・非常勤可"},
-        {key:"soudan",name:"生活相談員",          std:Math.max(1,CEIL(u/100)), a:W.soudan, note:"入所者100人に1以上"},
-        {key:"kango", name:"看護職員",            std:kango,          a:W.kango,  note:"30以下1／30超50以下2／50超130以下3／130超は50ごとに+1"},
-        {key:"kaigo", name:"介護職員",            std:Math.max(0,core-kango), a:W.kaigo, note:"介護＋看護で入所者3人に1（3:1）"},
-        {key:"kinou", name:"機能訓練指導員",      std:1,               a:W.kinou,  note:"1以上・兼務可"},
-        {key:"cm",    name:"介護支援専門員",      std:Math.max(1,CEIL(u/100)), a:W.cm,  note:"1以上（100:1を標準）・兼務可"},
-        {key:"eiyou", name:"管理栄養士・栄養士",  std:1,               a:W.eiyou,  note:"1以上"},
-        {key:"chouri",name:"調理員・その他",      std:0,             a:W.chouri, note:"基準なし。給食委託なら0"},
-        {key:"jimu",  name:"事務職員",            std:0,             a:W.jimu,   note:"基準なし"}
+        {key:"kaigo", name:"介護職員", std:R1(Math.max(0, core - kango)), note:"介護＋看護で入所者3人に1（3:1）"},
+        {key:"kango", name:"看護職員", std:R1(kango), note:"30以下1／30超50以下2／50超130以下3／130超は50ごとに+1"},
+        {key:"other", name:"その他職員", std:R1(other),
+         note:"施設長1・医師0.1・生活相談員"+cm100+"・機能訓練指導員1・介護支援専門員"+cm100+"・管理栄養士1 の合計"}
       ];
     },
     ratio:{ label:"介護・看護職員 対 入所者", roles:["kaigo","kango"], std:3 }
@@ -59,21 +55,16 @@ var SERVICES = {
     build:function(s){
       var u = this.users(s);
       var kango = u <= 30 ? 1 : u <= 50 ? 2 : u <= 130 ? 3 : 3 + CEIL((u - 130) / 50);
-      var core = u / 3, r = u / 80;
+      var core = u / 3, cm100 = Math.max(1, CEIL(u / 100));
       // 日中16時間×常時1人／ユニット ＋ 夜間8時間×1人／2ユニット を週7日回す常勤換算
       var byUnit = (s.units || 1) * (16 + 8/2) * 7 / (s.week || 40);
+      var other = 1 + 0.1 + cm100 + 1 + cm100 + 1;
       return [
-        {key:"chief", name:"施設長",            std:1, a:W.chief, note:"常勤専従1"},
-        {key:"ishi",  name:"医師（嘱託）",       std:0.1, a:W.ishi, note:"必要数・非常勤可"},
-        {key:"soudan",name:"生活相談員",         std:Math.max(1,CEIL(u/100)), a:W.soudan, note:"入所者100人に1以上"},
-        {key:"kango", name:"看護職員",           std:kango, a:W.kango, note:"段階配置"},
-        {key:"kaigo", name:"介護職員",           std:Math.max(0, Math.max(core, byUnit) - kango), a:W.kaigo,
-                      note:"3:1と、ユニット常時配置に要する数の大きい方。後者は日中16h×1人／U＋夜間8h×1人／2Uを週7日で換算した目安（未検証）"},
-        {key:"kinou", name:"機能訓練指導員",     std:1, a:W.kinou, note:"1以上・兼務可"},
-        {key:"cm",    name:"介護支援専門員",     std:Math.max(1,CEIL(u/100)), a:W.cm, note:"1以上・兼務可"},
-        {key:"eiyou", name:"管理栄養士・栄養士", std:1, a:W.eiyou, note:"1以上"},
-        {key:"chouri",name:"調理員・その他",     std:0, a:W.chouri, note:"基準なし。給食委託なら0"},
-        {key:"jimu",  name:"事務職員",           std:0, a:W.jimu, note:"基準なし"}
+        {key:"kaigo", name:"介護職員", std:R1(Math.max(0, Math.max(core, byUnit) - kango)),
+         note:"3:1と、ユニット常時配置に要する数の大きい方（日中16h×1人／U＋夜間8h×1人／2Uを週7日で換算・未検証）"},
+        {key:"kango", name:"看護職員", std:R1(kango), note:"段階配置（30以下1／30超50以下2／50超130以下3／130超は50ごとに+1）"},
+        {key:"other", name:"その他職員", std:R1(other),
+         note:"施設長1・医師0.1・生活相談員"+cm100+"・機能訓練指導員1・介護支援専門員"+cm100+"・管理栄養士1 の合計"}
       ];
     },
     ratio:{ label:"介護・看護職員 対 入所者", roles:["kaigo","kango"], std:3 }
@@ -87,19 +78,15 @@ var SERVICES = {
             {k:"occ",label:"稼働率",unit:"％",val:92,step:1}],
     users:function(s){ return s.cap * s.occ / 100; },
     build:function(s){
-      var u = this.users(s), core = u / 3, r = u / 92;
+      var u = this.users(s), core = u / 3;
+      var ishi = Math.max(1, u / 100), soudan = Math.max(1, CEIL(u / 100)), pt = Math.max(1, u / 100);
+      var cm = Math.max(1, CEIL(u / 100)), eiyou = (s.cap >= 100) ? 1 : 0;
+      var other = 1 + ishi + soudan + pt + cm + eiyou + 0.2;  // 管理者・医師・支援相談員・PT/OT/ST・介護支援専門員・管理栄養士・薬剤師0.2
       return [
-        {key:"chief", name:"管理者（施設長）",   std:1, a:W.chief, note:"常勤1"},
-        {key:"ishi",  name:"医師",               std:Math.max(1,u/100), a:W.ishi, note:"入所者100人に1以上・常勤1以上"},
-        {key:"kango", name:"看護職員",           std:core*2/7, a:W.kango, note:"看護・介護3:1のうち看護2/7が標準"},
-        {key:"kaigo", name:"介護職員",           std:core*5/7, a:W.kaigo, note:"同うち介護5/7が標準"},
-        {key:"soudan",name:"支援相談員",         std:Math.max(1,CEIL(u/100)), a:W.soudan, note:"1以上（100:1）"},
-        {key:"pt",    name:"PT・OT・ST",         std:Math.max(1,u/100), a:W.pt, note:"入所者100人に1以上"},
-        {key:"cm",    name:"介護支援専門員",     std:Math.max(1,CEIL(u/100)), a:W.cm, note:"1以上（100:1）"},
-        {key:"eiyou", name:"管理栄養士・栄養士", std:(s.cap>=100)?1:0, a:W.eiyou, note:"入所定員100以上で1以上"},
-        {key:"yakuzai",name:"薬剤師",            std:0.2, a:W.yakuzai, note:"実情に応じた適当数"},
-        {key:"chouri",name:"調理員・その他",     std:0, a:W.chouri, note:"基準なし。給食委託なら0"},
-        {key:"jimu",  name:"事務職員",           std:0, a:W.jimu, note:"基準なし"}
+        {key:"kaigo", name:"介護職員", std:R1(core * 5 / 7), note:"看護・介護3:1のうち介護5/7が標準"},
+        {key:"kango", name:"看護職員", std:R1(core * 2 / 7), note:"看護・介護3:1のうち看護2/7が標準"},
+        {key:"other", name:"その他職員", std:R1(other),
+         note:"管理者1・医師"+R1(ishi)+"・支援相談員"+soudan+"・PT/OT/ST"+R1(pt)+"・介護支援専門員"+cm+"・管理栄養士"+eiyou+"・薬剤師0.2 の合計"}
       ];
     },
     ratio:{ label:"看護・介護職員 対 入所者", roles:["kaigo","kango"], std:3 }
@@ -115,17 +102,16 @@ var SERVICES = {
             {k:"days",label:"週の営業日数",unit:"日",val:6,step:1}],
     users:function(s){ return s.cap * s.occ / 100; },
     build:function(s){
-      var u = this.users(s), r = u / 30.8;
+      var u = this.users(s);
       var need = u <= 15 ? 1 : 1 + (u - 15) / 5;
       var f = (s.hours * s.days) / (s.week || 40);
+      var other = 1 + f + 0.5;  // 管理者1・生活相談員f・機能訓練指導員0.5
       return [
-        {key:"chief", name:"管理者",           std:1, a:W.chief, note:"常勤専従1（兼務可）"},
-        {key:"soudan",name:"生活相談員",       std:f, a:W.soudan, note:"提供時間帯を通じて専従1以上"},
-        {key:"kaigo", name:"介護職員",         std:need*f, a:W.kaigo,
-                      note:"15人まで1、超過分5人ごとに+1を提供時間帯を通じて。常勤換算＝必要員数×(提供時間×営業日数)÷週所定労働時間"},
-        {key:"kango", name:"看護職員",         std:f, a:W.kango, note:"1以上（定員10人以下は不要・兼務や緩和の規定あり）"},
-        {key:"kinou", name:"機能訓練指導員",   std:0.5, a:W.kinou, note:"1以上・兼務可（目安値）"},
-        {key:"unten", name:"送迎・調理・事務", std:0, a:W.jimu, note:"基準なし"}
+        {key:"kaigo", name:"介護職員", std:R1(need * f),
+         note:"15人まで1、超過分5人ごとに+1を提供時間帯を通じて（常勤換算＝必要員数×提供時間×営業日数÷週所定労働時間）"},
+        {key:"kango", name:"看護職員", std:R1(f), note:"1以上（定員10人以下は不要・兼務や緩和の規定あり）"},
+        {key:"other", name:"その他職員", std:R1(other),
+         note:"管理者1・生活相談員"+R1(f)+"・機能訓練指導員0.5 の合計（送迎・調理・事務は基準なし）"}
       ];
     },
     ratio:{ label:"介護・看護職員 対 利用者（常勤換算）", roles:["kaigo","kango"], std:null }
@@ -144,8 +130,9 @@ var SERVICES = {
 
   /* 入力 I（DOM非依存）から、画面に出す全数値を計算して返す。
      収益 rev・人件費総額 total はともに決算書からの実額入力。人件費率は total/rev で出力する。
-     I = { service, sizes, week, rev, total, fuku, bonus, hiW,
-           scale, nminAuto, nminManual, atgt, g, rows:[{key,name,note,n,hi}] } */
+     hakenFee は total の内数（派遣職員費）。職員給与原資 = (total − hakenFee)/(1+fuku)。
+     I = { service, sizes, week, rev, total, hakenFee, fuku, bonus,
+           scale, nminAuto, nminManual, atgt, g, rows:[{key,name,note,n,hi,haken}] } */
   function calcState(I){
     var svc = SERVICES[I.service];
     var sz = {}; for (var q in I.sizes) sz[q] = I.sizes[q];
@@ -156,40 +143,45 @@ var SERVICES = {
     var stdMap = {}, noteMap = {};
     stdRows.forEach(function(r){ stdMap[r.key] = r.std; noteMap[r.key] = r.note; });
 
-    var scale = I.scale, hw = I.hiW / 100;
+    var scale = I.scale;
     var rows = I.rows.map(function(r){
       return {
         key:r.key, name:r.name,
         note: (noteMap[r.key] != null ? noteMap[r.key] : r.note),
         std:  (stdMap[r.key]  != null ? stdMap[r.key]  : null),
-        n:  Math.max(0, r.n  || 0),
-        hi: Math.max(0, r.hi || 0)
+        n:     Math.max(0, r.n     || 0),   // 正規
+        hi:    Math.max(0, r.hi    || 0),   // 非正規
+        haken: Math.max(0, r.haken || 0)    // 派遣
       };
     });
 
-    /* 原資（収益・人件費総額ともに決算書からの実額入力）。人件費率は割り算で出力する。 */
-    var rev = I.rev, total = I.total;
-    var pool  = total / (1 + I.fuku / 100);
+    /* 原資（収益・人件費総額ともに決算書からの実額入力）。人件費率は割り算で出力する（v0.4）。
+       v0.5: 派遣職員費は人件費総額の内数。職員給与原資は総額から派遣費を除いてから法定福利費を
+       割り戻す（派遣費は派遣会社が事業主負担を持つため割り戻さない）。非正規の賃金水準係数は廃止し、
+       金額は正規・非正規で分けない（人数は配置判定・正規比率に使う）。 */
+    var rev = I.rev, total = I.total, hakenFee = Math.min(Math.max(0, I.hakenFee || 0), total);
+    var staffPool = (total - hakenFee) / (1 + I.fuku / 100);  // 職員給与原資（正規＋非正規の額面原資）
     var opDays  = opDaysOf(sz);
-    var unitRev = (users > 0 && opDays > 0) ? rev * 10000 / (users * opDays) : 0; // 円/人/日（出力）
+    var unitRev = (users > 0 && opDays > 0) ? rev * 10000 / (users * opDays) : 0; // 1人1日あたり収入（出力）
 
-    /* 人数と賃金
-       v0.4: 職種別の基準年収を廃止。給与原資 pool を全員に均一に配り、非正規は
-       正規の hw 倍とする。avgSe*(nSe+hw*nHi)=pool を満たす avgSe が正規の平均年収。
-       職種間の配分（v0.3 の賃金倍率 k）は主題（総額は配分に依らない）と無関係なため削除。 */
-    var baseS = 0, baseH = 0, stdN = 0;
+    var baseS = 0, baseH = 0, baseK = 0, stdN = 0;
     rows.forEach(function(r){
-      baseS += r.n; baseH += r.hi; stdN += (r.std || 0);
+      baseS += r.n; baseH += r.hi; baseK += r.haken; stdN += (r.std || 0);
     });
-    var baseN = baseS + baseH;
-    var n    = baseN * scale, nSe = baseS * scale, nHi = baseH * scale;
-    var avg   = n   > 0 ? pool / n : 0;
-    var wUnits = nSe + hw * nHi;                 // 正規換算の重み合計
-    var avgSe = wUnits > 0 ? pool / wUnits : 0;  // 正規の平均年収
-    var avgHi = avgSe * hw;                       // 非正規の平均年収
+    var staffBase = baseS + baseH, fteBase = staffBase + baseK;
+    var nSe = baseS * scale, nHi = baseH * scale, nHk = baseK * scale;
+    var staffN = staffBase * scale;   // 職員数（正規＋非正規）
+    var fteAll = fteBase * scale;      // 常勤換算合計（派遣込み・配置基準に使う）
+    var n = staffN, pool = staffPool;  // グラフ・成立判定の人数と原資は「職員」（段階2で配置比率軸へ）
+    var A = fteAll > 0 ? total / fteAll : 0;                          // 1人あたり給与費（派遣込み・事業主負担込み）
+    var B = staffN > 0 ? staffPool / staffN : 0;                      // 職員1人あたり給与費（額面）
+    var avg = B;                                                     // 既存 chart/verdict 等の「平均年収」＝ B
+    var hakenUnit = nHk > 0 ? hakenFee / nHk : 0;                     // 派遣1人あたり費用
+    var staffUnitCost = staffN > 0 ? (total - hakenFee) / staffN : 0; // 職員1人あたり人件費（事業主負担込み）
+    var regRatio = staffN > 0 ? nSe / staffN * 100 : 0;              // 正規比率（正規÷職員）
 
     rows.forEach(function(r){
-      r.totalFte  = (r.n + r.hi) * scale;
+      r.totalFte  = (r.n + r.hi + r.haken) * scale;  // 配置は派遣込み
     });
 
     /* 職種別の基準充足 */
@@ -197,12 +189,12 @@ var SERVICES = {
     rows.forEach(function(r){
       if (!r.std || r.std <= 0) return;
       if (r.totalFte < r.std - 1e-9) shorts.push({ name:r.name, gap:r.std - r.totalFte });
-      var tot = r.n + r.hi;
+      var tot = r.n + r.hi + r.haken;
       if (tot <= 0){ blocked = r.name; return; }
       var need = r.std / tot;
       if (need > sMin) sMin = need;
     });
-    var nMinComp = blocked ? Infinity : baseN * sMin;
+    var nMinComp = blocked ? Infinity : fteBase * sMin;
     var nmin = I.nminAuto
       ? (isFinite(nMinComp) ? Math.ceil(nMinComp * 10) / 10 : stdN)
       : I.nminManual;
@@ -253,35 +245,27 @@ var SERVICES = {
       }
     };
 
-    /* 限界トレードオフ */
+    /* 限界トレードオフ（v0.5: 非正規の賃金水準係数を廃したため、金額を正規/非正規で分ける
+       トレードオフは削除。人数と原資の関係のみ残す） */
     var up = 10, f1 = 1 + I.fuku / 100;
     var needMoreTotal = n * up * f1;
-    var hiNow = n > 0 ? nHi / n : 0, hiNew = Math.min(1, hiNow + 0.10);
-    /* 非正規率を +10pt したときの重み係数（正規換算1人あたりコスト）。基準年収に依らない。 */
-    var Cnow = (1 - hiNow) + hiNow * hw;
-    var Cnew = (1 - hiNew) + hiNew * hw;
-    /* 人数を保ったまま非正規率を上げたときの正規平均年収（新式）。 */
-    var wUnits2 = n * ((1 - hiNew) + hw * hiNew);
-    var avgSe2  = wUnits2 > 0 ? pool / wUnits2 : 0;
     var marg = {
       perPerson: n > 0 ? pool / n - pool / (n + 1) : 0,
       needMoreTotal: needMoreTotal,
       cutN: (avg + up) > 0 ? n - pool / (avg + up) : 0,
       ptUp: rev > 0 ? needMoreTotal / rev * 100 : 0,
-      revUp: effRatio > 0 ? needMoreTotal / (effRatio / 100) : 0,
-      hiNow: hiNow * 100, hiNew: hiNew * 100,
-      dN: Cnew > 0 ? n * (Cnow / Cnew - 1) : 0,
-      dAvgSe: avgSe2 - avgSe
+      revUp: effRatio > 0 ? needMoreTotal / (effRatio / 100) : 0
     };
 
     return {
       service:I.service, svcName:svc.name, svc:svc, sizes:I.sizes, week:I.week,
       scale:scale,
-      fuku:I.fuku, bonus:I.bonus, hw:hw, atgt:I.atgt,
-      rev:rev, total:total, pool:pool, effRatio:effRatio, unitRev:unitRev,
-      rows:rows, baseS:baseS, baseH:baseH, baseN:baseN, stdN:stdN,
-      n:n, nSe:nSe, nHi:nHi, hiRate: n > 0 ? nHi / n * 100 : 0,
-      avg:avg, avgSe:avgSe, avgHi:avgHi, perHead: avg * (1 + I.fuku / 100),
+      fuku:I.fuku, bonus:I.bonus, atgt:I.atgt,
+      rev:rev, total:total, hakenFee:hakenFee, pool:pool, effRatio:effRatio, unitRev:unitRev,
+      rows:rows, baseS:baseS, baseH:baseH, baseK:baseK, baseN:staffBase, stdN:stdN,
+      n:n, nSe:nSe, nHi:nHi, nHk:nHk, staffN:staffN, fteAll:fteAll,
+      A:A, B:B, avg:avg,
+      hakenUnit:hakenUnit, staffUnitCost:staffUnitCost, regRatio:regRatio,
       sMin:sMin, nMinComp:nMinComp, shorts:shorts, blocked:blocked, nmin:nmin,
       slackN: (isFinite(nMinComp) ? n - nMinComp : Infinity),  // 配置の余裕（人）
       slackWage: (I.atgt > 0 ? avg / I.atgt : Infinity),        // 賃金の余裕（倍）
@@ -295,14 +279,12 @@ var SERVICES = {
     };
   }
 
-  /* 初期行（実配置＝基準、非正規0）
-     基準は 0.1 単位で切り上げて置く（CEIL）。四捨五入だと基準を下回る側に
-     丸める職種が生じ（例: 老健の介護 std=21.905 → 21.9）、起動直後に
-     「実配置＝基準」と謳いながら 0.0 人不足・下限0.1人割れの矛盾表示が出るため。 */
+  /* 初期行（実配置＝基準を正規に、非正規・派遣は0）。
+     基準 std は build 側で 0.1 単位に丸め済みなので、正規＝std をそのまま置けば
+     基準合計＝正規合計 が厳密に一致し（INV-25）、丸めによる幻の不足も出ない。 */
   function initialRows(svcKey, sizes, week){
     return buildStandard(svcKey, sizes, week).map(function(r){
-      return { key:r.key, name:r.name, note:r.note,
-               n: Math.ceil((r.std || 0) * 10 - 1e-9) / 10, hi:0 };
+      return { key:r.key, name:r.name, note:r.note, n:(r.std || 0), hi:0, haken:0 };
     });
   }
 
@@ -319,8 +301,9 @@ var SERVICES = {
     var s = (scale > 0) ? scale : 1;
     return rows.map(function(r){
       var o = {}; for (var k in r) o[k] = r[k];
-      o.n  = (r.n  || 0) * s;
-      o.hi = (r.hi || 0) * s;
+      o.n     = (r.n     || 0) * s;
+      o.hi    = (r.hi    || 0) * s;
+      o.haken = (r.haken || 0) * s;
       return o;
     });
   }

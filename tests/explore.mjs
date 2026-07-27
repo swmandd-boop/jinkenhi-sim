@@ -27,16 +27,18 @@ function randomInput() {
   const week = Math.round(between(30, 48));
   const rows = initialRows(service, sizes, week).map(r => ({
     ...r,
-    n:  Math.max(0, Math.round(r.n * between(0, 2.2) * 10) / 10),
-    hi: Math.round(between(0, 8) * 10) / 10
+    n:     Math.max(0, Math.round(r.n * between(0, 2.2) * 10) / 10),
+    hi:    Math.round(between(0, 8) * 10) / 10,
+    haken: Math.round(between(0, 5) * 10) / 10   // v0.5: 派遣人数（配置基準に算入・原資配分外）
   }));
+  const total = Math.round(between(0, 60000));
   return {
     service, sizes, week,
     rev: Math.round(between(0, 90000)),      // 収益・人件費総額ともに実額入力（率は出力）
-    total: Math.round(between(0, 60000)),
+    total,
+    hakenFee: Math.round(between(0, total)),  // 人件費総額の内数（engine 側で total にクランプ）
     fuku: Math.round(between(0, 30) * 10) / 10,
     bonus: Math.round(between(0, 8) * 10) / 10,
-    hiW: Math.round(between(0, 150)),
     scale: Math.round(between(0.4, 1.8) * 1000) / 1000,
     nminAuto: rnd() < 0.6,
     nminManual: Math.round(between(0, 120) * 10) / 10,
@@ -52,15 +54,16 @@ const CHECKS = [
       && c.rows.every(r => !Number.isNaN(r.totalFte))
       && c.proj.horizons.every(x => Number.isFinite(x.ratio) && Number.isFinite(x.delta))
       && ["delta","revUp","rate","cutN"].every(k => Number.isFinite(c.proj.absorb[k]))],
-  ["人数×平均年収＝給与原資", (c) => near(c.n * c.avg, c.pool, 1e-8)],
-  ["給与原資×(1+負担率)＝人件費総額", (c, I) => near(c.pool * (1 + I.fuku / 100), c.total)],
+  ["職員数×職員1人あたり給与費＝給与原資", (c) => near(c.n * c.avg, c.pool, 1e-8)],
+  ["給与原資×(1+負担率)＋派遣費＝人件費総額", (c, I) => near(c.pool * (1 + I.fuku / 100) + c.hakenFee, c.total, 1e-6)],
   ["未達なしなら全職種で基準以上", (c) => c.shorts.length > 0 || c.blocked
       || c.rows.every(r => !(r.std > 0) || r.totalFte >= r.std - 1e-9)],
   ["未達ありなら該当職種が実際に不足", (c) => c.shorts.every(x => {
       const r = c.rows.find(y => y.name === x.name); return r && r.totalFte < r.std - 1e-9; })],
   ["配置比率の分母は正規＋非正規", (c) => !c.svc.ratio || near(c.coreN,
       c.rows.filter(r => c.svc.ratio.roles.includes(r.key)).reduce((a, r) => a + r.totalFte, 0))],
-  ["非正規平均＝正規平均×賃金水準", (c) => c.nHi <= 0 || near(c.avgHi, c.avgSe * c.hw, 1e-9)],
+  ["A の分母は正規＋非正規＋派遣", (c) => near(c.A, c.fteAll > 0 ? c.total / c.fteAll : 0, 1e-8)],
+  ["B の分母は正規＋非正規（派遣を除く）", (c) => near(c.B, c.staffN > 0 ? c.pool / c.staffN : 0, 1e-8)],
   ["構成考慮の下限≧基準の単純合計", (c) => !isFinite(c.nMinComp) || c.nMinComp >= c.stdN - 1e-9],
   ["成立判定が下限と上限に整合", (c) => c.feasible === (c.nmin <= c.nCap + 1e-9)],
   ["スケールで給与原資が変わらない", (c, I) => near(calcState({ ...I, scale: I.scale * 1.37 }).pool, c.pool)],
@@ -69,7 +72,7 @@ const CHECKS = [
       const d = calcState({ ...I, rows });
       return near(d.pool, c.pool) && near(d.total, c.total) && near(d.n, c.n); }],
   ["不足を埋めると未達が解消", (c, I) => calcState(fillStd(I)).shorts.length === 0 || !!c.blocked],
-  ["正規payroll＋非正規payroll＝給与原資", (c) => near(c.nSe * c.avgSe + c.nHi * c.avgHi, c.pool, 1e-8)]
+  ["派遣0なら A÷B＝1+負担率", (c, I) => c.nHk > 0 || c.B <= 0 || near(c.A / c.B, 1 + I.fuku / 100, 1e-8)]
 ];
 
 let fails = 0;
