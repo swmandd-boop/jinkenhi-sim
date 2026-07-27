@@ -98,42 +98,35 @@ function rowTriples(t) {
   }));
 }
 
-test("UI-06 スライダー確定後は正規計＋非正規計＝合計（合計行・各行とも・全scale）", () => {
+test("UI-06 スライダー操作後は正規計＋非正規計＝合計（合計行・各行とも・全つまみ位置）", () => {
   for (const sc of [0.4, 0.7, 1.0, 1.3, 1.8]) {
     const t = open();
     // 正規・非正規を混在させる（介護を正規20/非正規11、事務・調理も入れる）
     t.row(4, "n", 20); t.row(4, "hi", 11); t.row(8, "n", 3); t.row(9, "n", 2);
     slide(t, sc);
-    // 確定後は scale が 1 に戻る
-    assert.equal(parseFloat(t.d.getElementById("scale").value), 1, `scale=${sc}: 確定後に1へ戻っていない`);
-    // 合計行: 正規計＋非正規計＝合計
+    // 合計行: 正規計＋非正規計＝合計（⑤で解消した不整合が再発しないこと）
     assert.ok(Math.abs(t.num("f-nbase") + t.num("f-hi") - t.num("f-n")) < 0.05,
-      `scale=${sc}: 正規計${t.num("f-nbase")}＋非正規計${t.num("f-hi")}≠合計${t.num("f-n")}`);
+      `つまみ=${sc}: 正規計${t.num("f-nbase")}＋非正規計${t.num("f-hi")}≠合計${t.num("f-n")}`);
     // 各行: 正規＋非正規＝合計
     for (const r of rowTriples(t)) {
       assert.ok(Math.abs(r.n + r.hi - r.tot) < 0.05,
-        `scale=${sc}: 行 正規${r.n}＋非正規${r.hi}≠合計${r.tot}`);
+        `つまみ=${sc}: 行 正規${r.n}＋非正規${r.hi}≠合計${r.tot}`);
     }
   }
 });
 
-test("UI-07 スライダー確定で scale が1に戻り、確定前の合計人数が保存される", () => {
+test("UI-07 スライダーはつまみ位置×基準へ人数を合わせ、footer と入力合計が一致する", () => {
   const t = open();
   t.row(4, "n", 20); t.row(4, "hi", 11); t.row(8, "n", 3); t.row(9, "n", 2);
-  const el = t.d.getElementById("scale");
-  const Ev = t.d.defaultView.Event;
-  el.value = "1.5";
-  el.dispatchEvent(new Ev("input", { bubbles: true }));      // ドラッグ中：合計が1.5倍で表示
-  const totalDuringDrag = t.num("o-n");                       // 確定前の表示（＝合計人数）
-  el.dispatchEvent(new Ev("change", { bubbles: true }));      // 離して確定＝書き戻し
-  assert.equal(parseFloat(t.d.getElementById("scale").value), 1, "確定後 scale が1でない");
+  const stdN = stateOf(t).stdN;
+  slide(t, 1.5);                              // つまみ1.5 → 合計 = 1.5×基準
+  assert.ok(Math.abs(stateOf(t).baseN - 1.5 * stdN) < 1e-6,
+    `合計が つまみ1.5×基準(${(1.5 * stdN).toFixed(2)}) と不一致: ${stateOf(t).baseN}`);
+  // footer 合計と入力欄の合計（表示 0.1 単位）が一致
   const triples = rowTriples(t);
   const sum = triples.reduce((a, r) => a + r.n + r.hi, 0);
-  // 0.1人単位の丸めを許容（各職種で n・hi を独立に丸めるため、最大 0.1×行数 の差）
-  assert.ok(Math.abs(sum - totalDuringDrag) <= 0.1 * triples.length,
-    `確定後合計${sum.toFixed(1)} が確定前表示${totalDuringDrag} と乖離（許容 ${(0.1 * triples.length).toFixed(1)}）`);
-  // footer 合計と入力合計も一致
-  assert.ok(Math.abs(t.num("f-n") - sum) < 0.05, `footer合計${t.num("f-n")}≠入力合計${sum.toFixed(1)}`);
+  assert.ok(Math.abs(t.num("f-n") - sum) < 0.1 * triples.length,
+    `footer合計${t.num("f-n")}≠入力合計${sum.toFixed(1)}`);
 });
 
 /* 新機能B（§6）: 定点の位置づけ。起動時（基準ちょうど配置）は警告を出し、
@@ -177,6 +170,39 @@ test("UI-10 スライダー確定でも nMinComp と職種構成比が保たれ�
   slideCommit(t, 0.4); check("×0.4");            // 単発（下げ）
   slideCommit(t, 1.5); slideCommit(t, 1 / 1.5); check("往復（×1.5→×1/1.5）");
   for (const s of [0.5, 1.8, 0.7, 1.3, 0.6, 1.8]) { slideCommit(t, s); check(`複数回 s=${s}`); }
+});
+
+/* 回帰: 書き戻し後に scale=1（中央）へ戻していたため、つまみを離すと位置が中央に戻っていた。
+   つまみ位置は「現在の合計 ÷ 基準（stdN）」を表し、確定後も現在の人数を反映して勝手に
+   戻らないこと、他の入力での再描画でも動かないことを固定する。 */
+test("UI-11 スライダーのつまみは確定後も現在の人数を反映し、勝手に戻らない", () => {
+  const t = open();
+  const knob = () => parseFloat(t.d.getElementById("scale").value);
+  const totalN = () => stateOf(t).baseN;
+  slideCommit(t, 1.6);                     // 増員側へドラッグして確定
+  const k1 = knob(), n1v = totalN();
+  assert.ok(k1 > 1.2, `確定後につまみが中央付近へ戻っている: knob=${k1}`);
+  t.set("bonus", 4.5);                      // STEP以外の入力を触って再描画
+  assert.ok(Math.abs(knob() - k1) < 0.02, `再描画でつまみが動いた: ${knob()} 期待${k1}`);
+  assert.ok(Math.abs(totalN() - n1v) < 1e-6, `再描画で人数が変わった: ${totalN()} 期待${n1v}`);
+  t.set("atgt", 500);
+  assert.ok(Math.abs(knob() - k1) < 0.02, `再描画でつまみが戻った: ${knob()}`);
+});
+
+/* 職種別内訳テーブルのレイアウトの構成担保（jsdom は実レイアウトを持たないため、
+   親幅に追従し狭い幅では横スクロールする CSS 構成を固定する。実ピクセルの欠けなしは
+   実機で確認）。table-layout:fixed + width:100% + min-width（狭幅でスクロール）。 */
+test("UI-12 職種別内訳テーブルは親幅に追従し、狭幅では横スクロールする構成である", () => {
+  const html = readFileSync(resolve(root, "jinkenhi-sim.html"), "utf8");
+  const css = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
+  const tableRule = css.match(/(?:^|\})\s*table\{([^}]*)\}/)[1];
+  assert.ok(/width:\s*100%/.test(tableRule), `table が width:100%（親幅追従）でない: ${tableRule}`);
+  assert.ok(/min-width:/.test(tableRule), `table に min-width（横スクロール確保）がない: ${tableRule}`);
+  assert.ok(/table-layout:\s*fixed/.test(tableRule), `table-layout:fixed でない: ${tableRule}`);
+  assert.ok(/\.tbl-scroll\{[^}]*overflow-x:\s*auto/.test(css), ".tbl-scroll に overflow-x:auto がない（切れて隠れる）");
+  assert.ok(/(th:first-child,\s*)?td:first-child\{[^}]*text-align:\s*left/.test(css), "職種名列が左寄せでない");
+  const t = open();
+  assert.equal(t.d.querySelectorAll("#tbl thead th").length, 6, "列数が6（5データ列＋削除列）でない");
 });
 
 /* 新機能A（§5）の表示条件を §6 に揃える：必要人件費率は nmin×atgt で計算するため、

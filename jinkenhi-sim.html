@@ -72,7 +72,7 @@ svg{display:block;width:100%;height:auto;touch-action:none;cursor:ew-resize}
 .verdict p:last-child{margin-bottom:0}
 .verdict ul{margin:8px 0 0;padding-left:1.1em;font-size:13.5px}
 b.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
-table{width:33.5em;table-layout:fixed;border-collapse:collapse;font-size:13px}
+table{width:100%;min-width:30em;table-layout:fixed;border-collapse:collapse;font-size:13px}
 th,td{padding:6px 4px;border-bottom:1px solid var(--rule);text-align:right;vertical-align:middle}
 th{font-size:11px;font-weight:500;color:var(--ink-2);letter-spacing:.04em;white-space:nowrap}
 th:first-child,td:first-child{text-align:left;padding-left:2px}
@@ -250,12 +250,12 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
       <table id="tbl">
         <thead>
           <tr>
-            <th style="width:11em">職種</th>
-            <th style="width:4.5em">基準<br>常勤換算</th>
-            <th style="width:5.2em">正規<br>常勤換算</th>
-            <th style="width:5.2em">非正規<br>常勤換算</th>
-            <th style="width:6em">合計<br>常勤換算</th>
-            <th style="width:1.6em"></th>
+            <th style="width:34%">職種</th>
+            <th style="width:12%">基準<br>常勤換算</th>
+            <th style="width:16%">正規<br>常勤換算</th>
+            <th style="width:16%">非正規<br>常勤換算</th>
+            <th style="width:16%">合計<br>常勤換算</th>
+            <th style="width:6%"></th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -760,18 +760,25 @@ function buildTable(){
   });
 }
 
+/* 表示は入力欄と同じ 0.1 単位に丸めた値から合計・footer を作る（rows 自体は満精度）。
+   こうすると 正規(0.1)＋非正規(0.1)＝合計、正規計＋非正規計＝合計 が表示上つねに厳密に
+   一致する（満精度を 0.1 で別々に丸めると生じる 0.1 の食い違いを起こさない）。
+   計算（平均年収・nMinComp・成立判定）は満精度の rows を使うので構成比は厳密に保たれる。 */
 function refreshTable(c){
-  var trs = $("tbody").children;
+  var trs = $("tbody").children, sSe = 0, sHi = 0;
   for (var i = 0; i < c.rows.length && i < trs.length; i++){
     var r = c.rows[i], t = trs[i];
+    var nd = Math.round(r.n * 10) / 10, hd = Math.round((r.hi || 0) * 10) / 10;
+    sSe += nd; sHi += hd;
     t.querySelector('[data-c="note"]').textContent = r.note || "";
     t.querySelector('[data-c="std"]').textContent  = (r.std == null) ? "–" : n1(r.std);
-    t.querySelector('[data-c="tot"]').textContent  = n1(r.totalFte);
+    t.querySelector('[data-c="tot"]').textContent  = n1(nd + hd);
   }
   $("f-std").textContent   = n1(c.stdN);
-  $("f-nbase").textContent = n1(c.nSe);
-  $("f-hi").textContent    = n1(c.nHi);
-  $("f-n").textContent     = n1(c.n);
+  $("f-nbase").textContent = n1(sSe);
+  $("f-hi").textContent    = n1(sHi);
+  $("f-n").textContent     = n1(sSe + sHi);
+  $("o-n").textContent     = n1(sSe + sHi);   // ヘッダ「職員数合計」も footer と一致させる
 }
 
 /* ---------- 数値パネル ---------- */
@@ -1109,27 +1116,31 @@ function makeText(c){
 
 /* ---------- 更新 ---------- */
 var last = null;
+/* 職員数スライダーの基準（つまみ位置の分母）。基準の単純合計 stdN を使い、
+   つまみは「現在の合計 ÷ 基準」を表す。基準が無い（0）ときは現在の合計を基準にする。 */
+function refTotal(c){ return (c && c.stdN > 0) ? c.stdN : (c ? c.baseN : 0); }
+
 function update(){
   var c = ENGINE.calcState(readInputs());
   last = c;
   if (autoRev && mode === "ratio") $("rev").value = Math.round(c.rev);
   if (!nminTouched) $("nmin").value = Math.round(c.nmin * 10) / 10;
+  /* つまみ位置＝現在の合計 ÷ 基準。確定後も現在の人数を反映し、中央へ戻らない。
+     range[0.4,1.8] に収める（実配置がそれを超えても表示上はクランプ）。 */
+  var refN = refTotal(c);
+  if (refN > 0) $("scale").value = Math.min(1.8, Math.max(0.4, c.baseN / refN));
   renderNumbers(c); renderEmp(c); renderRatio(c);
   renderCompliance(c); renderVerdict(c); renderNeedRatio(c); renderAnchor(c); renderMarginal(c); renderTrend(c); renderChart(c);
   return c;
 }
 window.__SWMD_STATE = function(){ return last; };
 
-/* スライダーを離した時点で倍率を実配置に畳み、scale を 1 に戻す。
-   ドラッグ中だけ内部倍率 scale を使い、確定でここに書き戻す。これで
-   未スケール値（入力列）とスケール後の値（合計列）が同時に画面へ出る
-   状態がなくなる（敵対的レビュー指摘⑤ / docs/v0.4-設計.md §9）。 */
-function commitScale(){
-  if (Math.abs(scale - 1) < 1e-9) return;
-  rows = ENGINE.scaleRows(rows, scale);
-  scale = 1;
-  $("scale").value = 1;
-  buildTable();
+/* 職員数スライダー／曲線ドラッグの共通処理: 実配置を目標合計 target に比例配分で
+   畳む（scale は常に 1 のまま＝計算はスケールしない）。丸めない（構成比・nMinComp を
+   厳密に保つ）。per-row の 正規＋非正規＝合計 は n*s+hi*s=(n+hi)*s で厳密に成立する。 */
+function foldTo(target){
+  var cur = rows.reduce(function(s, r){ return s + r.n + (r.hi || 0); }, 0);
+  if (cur > 0 && target > 0){ rows = ENGINE.scaleRows(rows, target / cur); buildTable(); }
   update();
 }
 
@@ -1166,9 +1177,6 @@ function loadService(){
 
 $("svc").addEventListener("change", function(){ svcKey = this.value; loadService(); });
 
-/* スライダーを離した（change）ら確定。input中はドラッグ扱いで scale のみ動かす。 */
-$("scale").addEventListener("change", commitScale);
-
 document.addEventListener("input", function(e){
   var t = e.target;
   if (t.dataset && t.dataset.sz !== undefined){
@@ -1180,7 +1188,7 @@ document.addEventListener("input", function(e){
     rows[+t.dataset.i][t.dataset.f] = parseFloat(t.value) || 0;
     update(); return;
   }
-  if (t.id === "scale"){ scale = parseFloat(t.value); update(); return; }
+  if (t.id === "scale"){ foldTo(parseFloat(t.value) * refTotal(last)); return; }
   if (t.id === "auto-rev"){ autoRev = t.checked; applyAutoRev(); update(); return; }
   if (t.id === "nmin"){ nminTouched = true; update(); return; }
   if (t.id === "atgt"){ atgtTouched = true; update(); return; }
@@ -1230,16 +1238,15 @@ document.addEventListener("click", function(e){
     var box = svg.getBoundingClientRect();
     var px = (ev.clientX - box.left)/box.width*VB.w;
     var v = view.xmin + (px - VB.l)/view.PW*(view.xmax - view.xmin);
-    var baseN = rows.reduce(function(s,r){ return s + r.n + (r.hi || 0); }, 0);
-    if (baseN <= 0) return;
-    scale = Math.min(1.8, Math.max(0.4, v/baseN));
-    $("scale").value = scale;
-    update();
+    var refN = refTotal(last);
+    if (refN <= 0) return;
+    /* 目標合計 v を [0.4,1.8]×基準 にクランプ（スライダーと同じ範囲）してから畳む。 */
+    foldTo(Math.min(1.8 * refN, Math.max(0.4 * refN, v)));
   }
   svg.addEventListener("pointerdown", function(e){ dragging = true; svg.setPointerCapture(e.pointerId); apply(e); });
   svg.addEventListener("pointermove", function(e){ if (dragging) apply(e); });
-  svg.addEventListener("pointerup", function(){ dragging = false; commitScale(); });
-  svg.addEventListener("pointercancel", function(){ dragging = false; commitScale(); });
+  svg.addEventListener("pointerup", function(){ dragging = false; });
+  svg.addEventListener("pointercancel", function(){ dragging = false; });
 })();
 
 loadService();
