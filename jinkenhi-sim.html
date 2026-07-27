@@ -221,6 +221,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
 
     <div id="compliance" class="verdict"></div>
     <div id="verdict" class="verdict"></div>
+    <div id="need-ratio" class="verdict"></div>
 
     <section class="panel">
       <h2>いま動かすと何が起きるか<span class="tag">限界トレードオフ</span></h2>
@@ -563,6 +564,14 @@ var SERVICES = {
     var needTotal = needPool * (1 + I.fuku / 100);
     var effRatio  = rev > 0 ? total / rev * 100 : 0;
 
+    /* 必要人件費率（新機能A）: 譲れない線（配置下限×下回れない平均年収）を守るのに
+       必要な人件費率。閾値は置かず符号だけで分岐する。rev>0・atgt>0 で feasible と等価。 */
+    var needRatioV = rev > 0 ? needTotal / rev * 100 : 0;
+    var needRevV   = I.ratio > 0 ? needTotal / (I.ratio / 100) : 0;
+    var gapPt   = needRatioV - effRatio;              // >0 なら人件費の内側で解けない
+    var gapRev  = (rev > 0 && I.ratio > 0) ? needRevV - rev : 0; // 収入をいくら増やすか
+    var gapCutN = isFinite(nCap) ? n - nCap : 0;       // 常勤換算を何人減らすか
+
     /* 限界トレードオフ */
     var up = 10, f1 = 1 + I.fuku / 100;
     var needMoreTotal = n * up * f1;
@@ -597,8 +606,8 @@ var SERVICES = {
       nCap:nCap, feasible:feasible,
       okN: n >= nmin - 1e-9, okA: avg >= I.atgt - 1e-9,
       needPool:needPool, needTotal:needTotal, gap: needTotal - total,
-      needRatio: rev > 0 ? needTotal / rev * 100 : 0,
-      needRev: I.ratio > 0 ? needTotal / (I.ratio / 100) : 0,
+      needRatio: needRatioV, needRev: needRevV,
+      gapPt: gapPt, gapRev: gapRev, gapCutN: gapCutN,
       marg:marg
     };
   }
@@ -824,6 +833,30 @@ function renderVerdict(c){
   box.innerHTML = h;
 }
 
+/* 新機能A: 必要人件費率（§5）。譲れない線を守るのに必要な人件費率を1つの数字に集約。
+   閾値は置かず gapPt の符号だけで分岐する。 */
+function renderNeedRatio(c){
+  var box = $("need-ratio");
+  if (!(c.rev > 0)){ box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  var h = "<h3>必要人件費率 <b class='num'>"+pct(c.needRatio)+"</b></h3>";
+  h += "<p>配置下限 <b class='num'>"+n1(c.nmin)+"</b> 人を平均年収 <b class='num'>"+n1(c.atgt)+
+       "</b> 万円で守るには、人件費率が <b class='num'>"+pct(c.needRatio)+
+       "</b> 必要です（現在 <b class='num'>"+pct(c.effRatio)+"</b>）。</p>";
+  if (c.gapPt <= 1e-9){
+    box.className = "verdict";
+    h += "<p>いまの人件費率の<b>内側で守れます</b>（余地 <b class='num'>"+Math.abs(c.gapPt).toFixed(1)+
+         "</b> ポイント）。この余地を、増員と賃上げのどちらに回すかの判断になります。</p>";
+  } else {
+    box.className = "verdict no";
+    h += "<p><b>いまの人件費率では "+c.gapPt.toFixed(1)+" ポイント不足</b>します。埋めるには次のどちらかです。</p><ul>";
+    if (c.mode === "ratio" && c.ratioIn > 0) h += "<li>収入を <b class='num'>"+man(c.gapRev)+"</b> 増やす</li>";
+    if (isFinite(c.nCap)) h += "<li>常勤換算を <b class='num'>"+n1(c.gapCutN)+" 人</b> 減らす</li>";
+    h += "</ul><p>ここから先は人件費の内側では解けません。収入を増やすか、人件費以外の費用を見直すかのどちらかになります。</p>";
+  }
+  box.innerHTML = h;
+}
+
 function renderMarginal(c){
   var m = c.marg, h = "";
   h += "<div class='row'><span class='k'>常勤換算を1人増やす</span><span class='v'>平均年収 −"+n1(m.perPerson)+" 万円</span></div>";
@@ -971,7 +1004,7 @@ function update(){
   if (autoRev && mode === "ratio") $("rev").value = Math.round(c.rev);
   if (!nminTouched) $("nmin").value = Math.round(c.nmin * 10) / 10;
   renderNumbers(c); renderEmp(c); renderRatio(c);
-  renderCompliance(c); renderVerdict(c); renderMarginal(c); renderChart(c);
+  renderCompliance(c); renderVerdict(c); renderNeedRatio(c); renderMarginal(c); renderChart(c);
   return c;
 }
 window.__SWMD_STATE = function(){ return last; };

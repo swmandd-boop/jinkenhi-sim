@@ -233,6 +233,14 @@ var SERVICES = {
     var needTotal = needPool * (1 + I.fuku / 100);
     var effRatio  = rev > 0 ? total / rev * 100 : 0;
 
+    /* 必要人件費率（新機能A）: 譲れない線（配置下限×下回れない平均年収）を守るのに
+       必要な人件費率。閾値は置かず符号だけで分岐する。rev>0・atgt>0 で feasible と等価。 */
+    var needRatioV = rev > 0 ? needTotal / rev * 100 : 0;
+    var needRevV   = I.ratio > 0 ? needTotal / (I.ratio / 100) : 0;
+    var gapPt   = needRatioV - effRatio;              // >0 なら人件費の内側で解けない
+    var gapRev  = (rev > 0 && I.ratio > 0) ? needRevV - rev : 0; // 収入をいくら増やすか
+    var gapCutN = isFinite(nCap) ? n - nCap : 0;       // 常勤換算を何人減らすか
+
     /* 限界トレードオフ */
     var up = 10, f1 = 1 + I.fuku / 100;
     var needMoreTotal = n * up * f1;
@@ -267,8 +275,8 @@ var SERVICES = {
       nCap:nCap, feasible:feasible,
       okN: n >= nmin - 1e-9, okA: avg >= I.atgt - 1e-9,
       needPool:needPool, needTotal:needTotal, gap: needTotal - total,
-      needRatio: rev > 0 ? needTotal / rev * 100 : 0,
-      needRev: I.ratio > 0 ? needTotal / (I.ratio / 100) : 0,
+      needRatio: needRatioV, needRev: needRevV,
+      gapPt: gapPt, gapRev: gapRev, gapCutN: gapCutN,
       marg:marg
     };
   }

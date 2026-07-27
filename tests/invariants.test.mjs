@@ -189,6 +189,22 @@ test("RKN-01 老健の管理栄養士は実利用者数でなく入所定員で�
   assert.equal(e99.std, 0, `定員99: 栄養士 std=${e99.std}（0のはず）`);
 });
 
+/* ---- 不変条件18（v0.4新機能A）: 必要人件費率の符号と成立判定が一致 ----
+   gapPt = needRatio - effRatio。rev>0・atgt>0 のとき gapPt<=0 ⇔ feasible。 */
+test("INV-18 gapPt<=0 と feasible が一致（rev>0・atgt>0）", () => {
+  for (const s of ALL) {
+    for (const atgt of [200, 400, 700]) {
+      for (const ratio of [40, 64.3, 90]) {
+        const c = calcState(makeInput(s, { atgt, ratio }));
+        if (c.rev > 0 && atgt > 0) {
+          assert.equal(c.gapPt <= 1e-9, c.feasible,
+            `${s} atgt=${atgt} ratio=${ratio}: gapPt=${c.gapPt} feasible=${c.feasible}`);
+        }
+      }
+    }
+  }
+});
+
 /* ---- 不変条件14: 負の値・ゼロ入力で NaN を出さない ---- */
 test("INV-14 極端な入力でも数値が壊れない", () => {
   const cases = [
