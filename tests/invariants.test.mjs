@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import * as ENGINE from "../engine.mjs";
 import { SERVICES, calcState } from "../engine.mjs";
 import { makeInput, run, near, fillStd } from "./helpers.mjs";
 
@@ -232,6 +233,61 @@ test("INV-25 初期状態で 基準合計 = 正規合計（厳密）", () => {
     assert.ok(near(stdSum, regSum, 1e-12), `${s}: 基準合計=${stdSum} ≠ 正規合計=${regSum}`);
     assert.equal(c.nHi, 0, `${s}: 初期の非正規は0のはず（nHi=${c.nHi}）`);
     assert.equal(c.nHk, 0, `${s}: 初期の派遣は0のはず（nHk=${c.nHk}）`);
+  }
+});
+
+/* ==== v0.5 段階2（配置比率軸）で追加する不変条件 ==== */
+
+/* ---- INV-27 配置比率 ＝ 入所者数 ÷（介護＋看護の合計）（§3）----
+   calcState の ratioActual が users/coreN で、coreN が核職種（介護・看護）の
+   常勤換算合計（正規＋非正規＋派遣）であること。さらに、比率を目標Rへ畳む変換
+   scaleCoreToRatio が実際にその比率を達成することを検算する。 */
+test("INV-27 配置比率 = 入所者数 ÷（介護＋看護の合計）", () => {
+  for (const s of ALL) {
+    // ランダムに核・その他を混ぜても、比率＝users/coreN が定義どおり成立する
+    for (const mul of [0.6, 1, 1.7]) {
+      let I = makeInput(s, { scale: mul });
+      I.rows = I.rows.map(r => ({ ...r, hi: (r.hi || 0) + 1, haken: (r.haken || 0) + 0.5 }));
+      const c = calcState(I);
+      const roles = c.svc.ratio ? c.svc.ratio.roles : [];
+      const coreFte = c.rows.filter(r => roles.includes(r.key)).reduce((a, r) => a + r.totalFte, 0);
+      assert.ok(near(c.coreN, coreFte, 1e-9), `${s}: coreN=${c.coreN} ≠ 核totalFte合計=${coreFte}`);
+      if (coreFte > 0) assert.ok(near(c.ratioActual, c.users / c.coreN, 1e-9),
+        `${s}: 配置比率=${c.ratioActual} ≠ users/coreN=${c.users / c.coreN}`);
+    }
+    // 目標比率Rへ核だけ按分 → 変換後の users/coreN が R に一致する
+    const base = makeInput(s);
+    const roles = SERVICES[s].ratio ? SERVICES[s].ratio.roles : [];
+    for (const R of [1.0, 2.0, 3.0, 4.0]) {
+      const c0 = calcState(base);
+      const newRows = ENGINE.scaleCoreToRatio(base.rows, roles, c0.users, R);
+      const c1 = calcState({ ...base, rows: newRows });
+      if (c1.coreN > 0) assert.ok(near(c1.users / c1.coreN, R, 1e-9),
+        `${s} R=${R}: 変換後 users/coreN=${c1.users / c1.coreN} ≠ ${R}`);
+    }
+  }
+});
+
+/* ---- INV-24 配置比率のドラッグでは その他職員 の人数が変わらない（§3）----
+   scaleCoreToRatio は核職種（介護・看護）だけを按分し、その他職員（施設長・医師・
+   相談員・機能訓練・介護支援専門員・管理栄養士の集約行）は動かさない。 */
+test("INV-24 配置比率ドラッグでその他職員の人数は不変", () => {
+  for (const s of ALL) {
+    const base = makeInput(s);
+    const roles = SERVICES[s].ratio ? SERVICES[s].ratio.roles : [];
+    const other0 = base.rows.filter(r => !roles.includes(r.key));
+    for (const R of [1.0, 2.5, 4.0]) {
+      const c0 = calcState(base);
+      const newRows = ENGINE.scaleCoreToRatio(base.rows, roles, c0.users, R);
+      const other1 = newRows.filter(r => !roles.includes(r.key));
+      assert.equal(other1.length, other0.length, `${s}: その他行数が変わった`);
+      other0.forEach((r0, i) => {
+        const r1 = other1.find(x => x.key === r0.key);
+        assert.ok(r1, `${s}: その他行 ${r0.key} が消えた`);
+        assert.ok(near(r1.n, r0.n, 1e-12) && near(r1.hi, r0.hi, 1e-12) && near(r1.haken, r0.haken, 1e-12),
+          `${s} R=${R}: その他行 ${r0.key} の人数が変わった（n ${r0.n}→${r1.n} / hi ${r0.hi}→${r1.hi} / haken ${r0.haken}→${r1.haken}）`);
+      });
+    }
   }
 });
 

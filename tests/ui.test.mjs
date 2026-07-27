@@ -95,7 +95,7 @@ function rowTriples(t) {
 }
 
 test("UI-06 スライダー操作後は正規計＋非正規計＋派遣計＝合計（合計行・各行とも・全つまみ位置）", () => {
-  for (const sc of [0.4, 0.7, 1.0, 1.3, 1.8]) {
+  for (const sc of [0.05, 0.25, 0.5, 0.75, 0.95]) {   // v0.5段2: つまみは配置比率の割合[0,1]
     const t = open();
     // 正規・非正規・派遣を混在させる（介護0を正規20/非正規11、その他2に正規3、看護1に派遣2）
     t.row(0, "n", 20); t.row(0, "hi", 11); t.row(2, "n", 3); t.row(1, "haken", 2);
@@ -111,13 +111,18 @@ test("UI-06 スライダー操作後は正規計＋非正規計＋派遣計＝�
   }
 });
 
-test("UI-07 スライダーはつまみ位置×基準へ人数を合わせ、footer と入力合計が一致する", () => {
+test("UI-07 スライダーは配置比率へ合わせ、その他職員は固定、footerと入力合計が一致する", () => {
   const t = open();
-  t.row(0, "n", 20); t.row(0, "hi", 11); t.row(2, "n", 3);
-  const stdN = stateOf(t).stdN;
-  slide(t, 1.5);                              // つまみ1.5 → 職員合計(正規＋非正規) = 1.5×基準
-  assert.ok(Math.abs(stateOf(t).baseN - 1.5 * stdN) < 1e-6,
-    `職員合計が つまみ1.5×基準(${(1.5 * stdN).toFixed(2)}) と不一致: ${stateOf(t).baseN}`);
+  t.row(0, "n", 20); t.row(0, "hi", 11); t.row(2, "n", 3);  // 介護に正規/非正規、その他に正規3
+  const other0 = rowTriples(t)[2];                          // その他行（index2）の初期値
+  // 特養は基準3:1。つまみ 0.5 → R = 4 − 3×0.5 = 2.5:1（基準より手厚い）
+  slide(t, 0.5);
+  const c = stateOf(t);
+  assert.ok(Math.abs(c.ratioActual - 2.5) < 1e-6, `配置比率が2.5:1にならない: ${c.ratioActual}`);
+  // その他職員（index2）は配置比率ドラッグで動かない
+  const other1 = rowTriples(t)[2];
+  assert.ok(Math.abs(other1.n - other0.n) < 1e-9 && Math.abs(other1.hi - other0.hi) < 1e-9 && Math.abs(other1.haken - other0.haken) < 1e-9,
+    `その他職員が動いた: ${JSON.stringify(other0)} → ${JSON.stringify(other1)}`);
   // footer 合計と入力欄の合計（表示 0.1 単位）が一致
   const triples = rowTriples(t);
   const sum = triples.reduce((a, r) => a + r.n + r.hi + r.haken, 0);
@@ -132,9 +137,11 @@ test("UI-08 定点の位置づけ：起動時は基準ちょうど警告＋賃�
   const anchor = () => t.txt("#anchor");
   assert.ok(anchor().includes("配置が基準ちょうど"), `起動時に基準ちょうど警告なし: ${anchor()}`);
   assert.ok(anchor().includes("賃金の余裕を見るには"), `atgt未入力で賃金余裕を伏せていない: ${anchor()}`);
-  // 下回れない平均年収を入力し、全職種を増員して基準ちょうどから外す
+  // 下回れない平均年収を入力し、全職種を基準超へ増員して基準ちょうどから外す。
+  // v0.5段2: 配置比率スライダーは介護・看護しか動かさず その他 が基準ちょうどのまま残るため、
+  // 基準ちょうど（全職種で余裕0）を外すには全行を基準超に手入力する。
   t.set("atgt", 450);
-  slide(t, 1.6);
+  t.row(0, "n", 30); t.row(1, "n", 5); t.row(2, "n", 8);   // 介護・看護・その他すべて基準超へ
   assert.ok(!anchor().includes("配置が基準ちょうど"), `増員後も基準ちょうど警告が残る: ${anchor()}`);
   assert.ok(anchor().includes("賃金の余裕"), `atgt入力後に賃金余裕を出していない: ${anchor()}`);
 });
@@ -150,42 +157,76 @@ function slideCommit(t, v){
   el.dispatchEvent(new Ev("input", { bubbles: true }));
   el.dispatchEvent(new Ev("change", { bubbles: true }));   // 離して確定
 }
-function compOf(c){
-  const tot = c.rows.reduce((a, r) => a + r.n + r.hi + (r.haken || 0), 0);
-  return c.rows.map(r => tot > 0 ? (r.n + r.hi + (r.haken || 0)) / tot : 0);
+/* v0.5段2: 配置比率のロスター断面。核（介護・看護）と その他 を分けて読む。 */
+function rosterSnap(t) {
+  const c = stateOf(t);
+  const roles = c.svc.ratio.roles;
+  const core = c.rows.filter(r => roles.includes(r.key));
+  const other = c.rows.filter(r => !roles.includes(r.key));
+  const tot = r => r.n + r.hi + (r.haken || 0);
+  return { c, core, other, tot };
 }
 
-test("UI-10 スライダー確定でも nMinComp と職種構成比が保たれる（単発・往復・複数回）", () => {
+test("UI-10 配置比率ドラッグはその他職員を固定し、介護:看護と各行内構成を保つ（単発・往復・複数回）", () => {
   const t = open();
   t.row(0, "hi", 4); t.row(2, "n", 3); t.row(1, "haken", 2);   // 正規/非正規/派遣を混ぜて崩れやすくする
-  const base = stateOf(t);
-  const nmc0 = base.nMinComp, comp0 = compOf(base);
+  const s0 = rosterSnap(t);
+  const kaigo0 = s0.core.find(r => r.key === "kaigo"), kango0 = s0.core.find(r => r.key === "kango");
+  const ratio0 = s0.tot(kaigo0) / s0.tot(kango0);           // 介護:看護
+  const comp0 = [kaigo0.n, kaigo0.hi, kaigo0.haken].map(v => v / s0.tot(kaigo0));  // 介護の正規/非正規/派遣構成比
   const check = (tag) => {
-    const c = stateOf(t);
-    assert.ok(Math.abs(c.nMinComp - nmc0) < 1e-6, `${tag}: nMinComp ${c.nMinComp} ≠ ${nmc0}`);
-    compOf(c).forEach((r, i) => assert.ok(Math.abs(r - comp0[i]) < 1e-6, `${tag}: 構成比[${i}] ${r} ≠ ${comp0[i]}`));
+    const s = rosterSnap(t);
+    // その他職員は不変
+    s0.other.forEach(o0 => {
+      const o1 = s.other.find(r => r.key === o0.key);
+      assert.ok(o1 && Math.abs(o1.n - o0.n) < 1e-9 && Math.abs(o1.hi - o0.hi) < 1e-9 && Math.abs((o1.haken || 0) - (o0.haken || 0)) < 1e-9,
+        `${tag}: その他 ${o0.key} が動いた`);
+    });
+    // 介護:看護 の比が保たれる
+    const k1 = s.core.find(r => r.key === "kaigo"), g1 = s.core.find(r => r.key === "kango");
+    assert.ok(Math.abs(s.tot(k1) / s.tot(g1) - ratio0) < 1e-9, `${tag}: 介護:看護 の比が変わった`);
+    // 介護行内の 正規/非正規/派遣 構成比が保たれる
+    [k1.n, k1.hi, k1.haken].map(v => v / s.tot(k1)).forEach((v, i) =>
+      assert.ok(Math.abs(v - comp0[i]) < 1e-9, `${tag}: 介護の構成比[${i}] が変わった`));
   };
-  slideCommit(t, 1.8); check("×1.8");            // 単発（上げ）
-  slideCommit(t, 0.4); check("×0.4");            // 単発（下げ）
-  slideCommit(t, 1.5); slideCommit(t, 1 / 1.5); check("往復（×1.5→×1/1.5）");
-  for (const s of [0.5, 1.8, 0.7, 1.3, 0.6, 1.8]) { slideCommit(t, s); check(`複数回 s=${s}`); }
+  slideCommit(t, 0.05); check("薄い端");
+  slideCommit(t, 0.95); check("手厚い端");
+  slideCommit(t, 0.5); slideCommit(t, 0.333); check("往復");
+  for (const f of [0.2, 0.8, 0.4, 0.6, 0.1, 0.9]) { slideCommit(t, f); check(`複数回 f=${f}`); }
 });
 
-/* 回帰: 書き戻し後に scale=1（中央）へ戻していたため、つまみを離すと位置が中央に戻っていた。
-   つまみ位置は「現在の合計 ÷ 基準（stdN）」を表し、確定後も現在の人数を反映して勝手に
-   戻らないこと、他の入力での再描画でも動かないことを固定する。 */
-test("UI-11 スライダーのつまみは確定後も現在の人数を反映し、勝手に戻らない", () => {
+/* 回帰: つまみを離すと位置が中央に戻る不具合。v0.5段2 ではつまみ＝現在の配置比率の軸上割合。
+   確定後も現在の比率を反映して勝手に戻らないこと、他の入力での再描画でも動かないことを固定する。 */
+test("UI-11 スライダーのつまみは確定後も現在の配置比率を反映し、勝手に戻らない", () => {
   const t = open();
   const knob = () => parseFloat(t.d.getElementById("scale").value);
-  const totalN = () => stateOf(t).baseN;
-  slideCommit(t, 1.6);                     // 増員側へドラッグして確定
-  const k1 = knob(), n1v = totalN();
-  assert.ok(k1 > 1.2, `確定後につまみが中央付近へ戻っている: knob=${k1}`);
+  const ratio = () => stateOf(t).ratioActual;
+  slideCommit(t, 0.7);                     // 手厚い側へドラッグして確定（R=1.9:1・frac=0.7）
+  const k1 = knob(), r1 = ratio();
+  assert.ok(k1 > 0.5, `確定後につまみが初期(0.333)付近へ戻っている: knob=${k1}`);
+  assert.ok(Math.abs(k1 - 0.7) < 0.01, `つまみが操作値0.7を反映していない: ${k1}`);
   t.set("bonus", 4.5);                      // STEP以外の入力を触って再描画
-  assert.ok(Math.abs(knob() - k1) < 0.02, `再描画でつまみが動いた: ${knob()} 期待${k1}`);
-  assert.ok(Math.abs(totalN() - n1v) < 1e-6, `再描画で人数が変わった: ${totalN()} 期待${n1v}`);
+  assert.ok(Math.abs(knob() - k1) < 0.01, `再描画でつまみが動いた: ${knob()} 期待${k1}`);
+  assert.ok(Math.abs(ratio() - r1) < 1e-9, `再描画で配置比率が変わった: ${ratio()} 期待${r1}`);
   t.set("atgt", 500);
-  assert.ok(Math.abs(knob() - k1) < 0.02, `再描画でつまみが戻った: ${knob()}`);
+  assert.ok(Math.abs(knob() - k1) < 0.01, `再描画でつまみが戻った: ${knob()}`);
+});
+
+/* INV-26 バーの位置とグラフの点の横位置が一致する（§3）。つまみ（#scale の値＝配置比率の
+   軸上割合）と、グラフの琥珀点の横位置（プロット領域内の割合）が一致することを実DOMで突合。 */
+test("INV-26 バーの位置とグラフの点の横位置が一致する", () => {
+  const t = open();
+  const VBl = 64, PW = 640 - 64 - 22;   // renderChart の VB.l と プロット幅
+  for (const frac of [0.2, 0.5, 0.8]) {
+    slide(t, frac);
+    const knob = parseFloat(t.d.getElementById("scale").value);
+    const pt = t.d.querySelector('#chart [data-o="point"]');
+    assert.ok(pt, `frac=${frac}: グラフの点が描かれていない`);
+    const cx = parseFloat(pt.getAttribute("cx"));
+    const chartFrac = (cx - VBl) / PW;
+    assert.ok(Math.abs(knob - chartFrac) < 0.005,
+      `frac=${frac}: つまみ位置 ${knob} とグラフ点の横位置 ${chartFrac} が不一致`);
+  }
 });
 
 /* 職種別内訳テーブルのレイアウトの構成担保（jsdom は実レイアウトを持たないため、

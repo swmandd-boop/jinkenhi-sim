@@ -42,7 +42,7 @@ async function measure(width) {
   await page.goto(fileUrl, { waitUntil: "load" });
   return await page.evaluate(() => {
     const fire = (el, t) => el.dispatchEvent(new Event(t, { bubbles: true }));
-    const sl = document.getElementById("scale"); sl.value = "1.7"; fire(sl, "input"); // 実配置をスケール
+    const sl = document.getElementById("scale"); sl.value = "1"; fire(sl, "input"); // 配置比率を最も手厚い側(1:1)へ＝介護・看護が最大人数（桁数が最大＝欠けの当たりが最も出やすい）
     const g = document.getElementById("g"); g.value = "2"; fire(g, "input");          // 推移表を出す
     const sc = document.querySelector(".tbl-scroll"), tbl = document.getElementById("tbl");
     const names = [...document.querySelectorAll("#tbody tr td:first-child")].map(td => {

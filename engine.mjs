@@ -199,11 +199,14 @@ var SERVICES = {
       ? (isFinite(nMinComp) ? Math.ceil(nMinComp * 10) / 10 : stdN)
       : I.nminManual;
 
-    /* 配置比率（雇用形態を問わず合計で数える） */
-    var coreN = 0;
+    /* 配置比率（雇用形態を問わず合計で数える）。coreN は核職種（介護・看護）の常勤換算合計
+       （派遣込み）。coreStaff は核の職員分（派遣を除く正規＋非正規）で、配置比率を動かしたとき
+       Bの分母（職員数）がどう動くかを出すのに使う（§3/§4）。 */
+    var coreN = 0, coreStaff = 0;
     if (svc.ratio) rows.forEach(function(r){
-      if (svc.ratio.roles.indexOf(r.key) >= 0) coreN += r.totalFte;
+      if (svc.ratio.roles.indexOf(r.key) >= 0){ coreN += r.totalFte; coreStaff += (r.n + r.hi) * scale; }
     });
+    var otherStaff = staffN - coreStaff;   // その他職員（配置比率ドラッグで固定される職員分）
     var ratioActual = (coreN > 0 && users > 0)
       ? (svc.ratio && svc.ratio.invert ? users / coreN : users / coreN) : 0;
     var ratioBad = !!(svc.ratio && svc.ratio.std && !svc.ratio.invert
@@ -269,7 +272,8 @@ var SERVICES = {
       sMin:sMin, nMinComp:nMinComp, shorts:shorts, blocked:blocked, nmin:nmin,
       slackN: (isFinite(nMinComp) ? n - nMinComp : Infinity),  // 配置の余裕（人）
       slackWage: (I.atgt > 0 ? avg / I.atgt : Infinity),        // 賃金の余裕（倍）
-      users:users, coreN:coreN, ratioActual:ratioActual, ratioBad:ratioBad,
+      users:users, coreN:coreN, coreStaff:coreStaff, otherStaff:otherStaff,
+      ratioActual:ratioActual, ratioBad:ratioBad,
       nCap:nCap, feasible:feasible,
       okN: n >= nmin - 1e-9, okA: avg >= I.atgt - 1e-9,
       needPool:needPool, needTotal:needTotal, gap: needTotal - total,
@@ -308,10 +312,43 @@ var SERVICES = {
     });
   }
 
+  /* 配置比率のドラッグ（§3）: 核職種（介護・看護）だけを目標比率 R へ按分する。
+     入所者数 users は固定なので、核の常勤換算合計を users/R に合わせる係数で
+     核行の n/hi/haken を一律に掛ける。その他職員（roles 外）は触らない（→ INV-24）。
+     介護・看護の相互比率と、各行内の正規/非正規/派遣の構成比は係数一律なので厳密に保たれる。
+     核が0人・users0・R0 のときは按分できないため素通し（複製のみ返す）。 */
+  function scaleCoreToRatio(rows, roles, users, R){
+    var curCore = 0;
+    rows.forEach(function(r){
+      if (roles.indexOf(r.key) >= 0) curCore += (r.n || 0) + (r.hi || 0) + (r.haken || 0);
+    });
+    var f = (curCore > 0 && users > 0 && R > 0) ? (users / R) / curCore : 1;
+    return rows.map(function(r){
+      var o = {}; for (var k in r) o[k] = r[k];
+      if (roles.indexOf(r.key) >= 0){
+        o.n = (r.n || 0) * f; o.hi = (r.hi || 0) * f; o.haken = (r.haken || 0) * f;
+      }
+      return o;
+    });
+  }
+
+  /* 配置比率 R のときの職員数（正規＋非正規・派遣除く）。核を R へ按分すると核職員は
+     coreStaff×(users/R)/coreN 倍に動き、その他職員 otherStaff は固定なので
+     staffN(R) = coreStaff·users/coreN / R + otherStaff = a/R + b。派遣は職員数に含めない。 */
+  function staffNAtRatio(c, R){
+    if (!(R > 0) || !(c.coreN > 0)) return c.staffN;
+    var a = c.coreStaff * c.users / c.coreN, b = c.staffN - c.coreStaff;
+    return a / R + b;
+  }
+  /* 配置比率 R のときの職員1人あたり給与費（額面 B）＝ 給与原資 ÷ 職員数(R)。 */
+  function bAtRatio(c, R){ var s = staffNAtRatio(c, R); return s > 0 ? c.pool / s : 0; }
+
   return { W:W, SERVICES:SERVICES, buildStandard:buildStandard,
-           calcState:calcState, initialRows:initialRows, scaleRows:scaleRows };
+           calcState:calcState, initialRows:initialRows, scaleRows:scaleRows,
+           scaleCoreToRatio:scaleCoreToRatio, staffNAtRatio:staffNAtRatio, bAtRatio:bAtRatio };
 })();
 /* ===== SWMD-ENGINE:END ===== */
 
 export default ENGINE;
-export const { SERVICES, buildStandard, calcState, initialRows, scaleRows } = ENGINE;
+export const { SERVICES, buildStandard, calcState, initialRows, scaleRows,
+  scaleCoreToRatio, staffNAtRatio, bAtRatio } = ENGINE;

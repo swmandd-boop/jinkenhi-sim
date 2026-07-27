@@ -195,18 +195,18 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
   <!-- ============ 右 ============ -->
   <div>
     <section class="chartbox">
-      <h2>等原資曲線</h2>
-      <p class="chartnote">曲線上のどの点も、人件費の支出は同額です。琥珀色の点を左右にドラッグすると、人数と賃金が反対向きに動きます。</p>
-      <svg id="chart" viewBox="0 0 640 400" role="img" aria-label="職員数と平均年収のトレードオフ曲線"></svg>
+      <h2>配置比率と賃金のトレードオフ</h2>
+      <p class="chartnote">横軸は介護・看護職員の配置比率（対 入所者）。琥珀色の点を左右にドラッグすると介護・看護の人数だけが動き（その他職員は固定）、手厚くするほど職員1人あたり給与費が下がります。左（薄い側）が基準割れです。</p>
+      <svg id="chart" viewBox="0 0 640 400" role="img" aria-label="配置比率と職員1人あたり給与費のトレードオフ曲線"></svg>
       <div class="legend">
-        <span><i style="border-color:var(--take)"></i>両方の線を満たす区間</span>
-        <span><i style="border-color:var(--ai);border-top-style:dashed"></i>譲れない線</span>
-        <span><i style="border-color:var(--shu);border-top-style:dashed"></i>職種別基準を満たす最小合計</span>
+        <span><i style="border-color:var(--take)"></i>基準内かつ賃金下限を満たす区間</span>
+        <span><i style="border-color:var(--ai);border-top-style:dashed"></i>賃金下限</span>
+        <span><i style="border-color:var(--shu);border-top-style:dashed"></i>基準線</span>
         <span><i style="border-color:var(--kohaku)"></i>いまの置き方</span>
       </div>
       <div class="scaler">
-        <label for="scale">職員数（常勤換算・合計）　<b class="num" id="o-n">–</b> 人</label>
-        <input type="range" id="scale" min="0.4" max="1.8" step="0.005" value="1">
+        <label for="scale">配置比率（介護・看護 対 入所者）　<b class="num" id="o-ratiobar">–</b> : 1　<span class="sub" style="color:var(--ink-2)">職員数合計 <b class="num" id="o-n">–</b> 人</span></label>
+        <input type="range" id="scale" min="0" max="1" step="0.002" value="0.333">
       </div>
       <div class="ratiobar" id="ratiobar"></div>
     </section>
@@ -531,11 +531,14 @@ var SERVICES = {
       ? (isFinite(nMinComp) ? Math.ceil(nMinComp * 10) / 10 : stdN)
       : I.nminManual;
 
-    /* 配置比率（雇用形態を問わず合計で数える） */
-    var coreN = 0;
+    /* 配置比率（雇用形態を問わず合計で数える）。coreN は核職種（介護・看護）の常勤換算合計
+       （派遣込み）。coreStaff は核の職員分（派遣を除く正規＋非正規）で、配置比率を動かしたとき
+       Bの分母（職員数）がどう動くかを出すのに使う（§3/§4）。 */
+    var coreN = 0, coreStaff = 0;
     if (svc.ratio) rows.forEach(function(r){
-      if (svc.ratio.roles.indexOf(r.key) >= 0) coreN += r.totalFte;
+      if (svc.ratio.roles.indexOf(r.key) >= 0){ coreN += r.totalFte; coreStaff += (r.n + r.hi) * scale; }
     });
+    var otherStaff = staffN - coreStaff;   // その他職員（配置比率ドラッグで固定される職員分）
     var ratioActual = (coreN > 0 && users > 0)
       ? (svc.ratio && svc.ratio.invert ? users / coreN : users / coreN) : 0;
     var ratioBad = !!(svc.ratio && svc.ratio.std && !svc.ratio.invert
@@ -601,7 +604,8 @@ var SERVICES = {
       sMin:sMin, nMinComp:nMinComp, shorts:shorts, blocked:blocked, nmin:nmin,
       slackN: (isFinite(nMinComp) ? n - nMinComp : Infinity),  // 配置の余裕（人）
       slackWage: (I.atgt > 0 ? avg / I.atgt : Infinity),        // 賃金の余裕（倍）
-      users:users, coreN:coreN, ratioActual:ratioActual, ratioBad:ratioBad,
+      users:users, coreN:coreN, coreStaff:coreStaff, otherStaff:otherStaff,
+      ratioActual:ratioActual, ratioBad:ratioBad,
       nCap:nCap, feasible:feasible,
       okN: n >= nmin - 1e-9, okA: avg >= I.atgt - 1e-9,
       needPool:needPool, needTotal:needTotal, gap: needTotal - total,
@@ -640,8 +644,40 @@ var SERVICES = {
     });
   }
 
+  /* 配置比率のドラッグ（§3）: 核職種（介護・看護）だけを目標比率 R へ按分する。
+     入所者数 users は固定なので、核の常勤換算合計を users/R に合わせる係数で
+     核行の n/hi/haken を一律に掛ける。その他職員（roles 外）は触らない（→ INV-24）。
+     介護・看護の相互比率と、各行内の正規/非正規/派遣の構成比は係数一律なので厳密に保たれる。
+     核が0人・users0・R0 のときは按分できないため素通し（複製のみ返す）。 */
+  function scaleCoreToRatio(rows, roles, users, R){
+    var curCore = 0;
+    rows.forEach(function(r){
+      if (roles.indexOf(r.key) >= 0) curCore += (r.n || 0) + (r.hi || 0) + (r.haken || 0);
+    });
+    var f = (curCore > 0 && users > 0 && R > 0) ? (users / R) / curCore : 1;
+    return rows.map(function(r){
+      var o = {}; for (var k in r) o[k] = r[k];
+      if (roles.indexOf(r.key) >= 0){
+        o.n = (r.n || 0) * f; o.hi = (r.hi || 0) * f; o.haken = (r.haken || 0) * f;
+      }
+      return o;
+    });
+  }
+
+  /* 配置比率 R のときの職員数（正規＋非正規・派遣除く）。核を R へ按分すると核職員は
+     coreStaff×(users/R)/coreN 倍に動き、その他職員 otherStaff は固定なので
+     staffN(R) = coreStaff·users/coreN / R + otherStaff = a/R + b。派遣は職員数に含めない。 */
+  function staffNAtRatio(c, R){
+    if (!(R > 0) || !(c.coreN > 0)) return c.staffN;
+    var a = c.coreStaff * c.users / c.coreN, b = c.staffN - c.coreStaff;
+    return a / R + b;
+  }
+  /* 配置比率 R のときの職員1人あたり給与費（額面 B）＝ 給与原資 ÷ 職員数(R)。 */
+  function bAtRatio(c, R){ var s = staffNAtRatio(c, R); return s > 0 ? c.pool / s : 0; }
+
   return { W:W, SERVICES:SERVICES, buildStandard:buildStandard,
-           calcState:calcState, initialRows:initialRows, scaleRows:scaleRows };
+           calcState:calcState, initialRows:initialRows, scaleRows:scaleRows,
+           scaleCoreToRatio:scaleCoreToRatio, staffNAtRatio:staffNAtRatio, bAtRatio:bAtRatio };
 })();
 /* ===== SWMD-ENGINE:END ===== */
 
@@ -956,76 +992,96 @@ function niceStep(raw){
   var p = Math.pow(10, Math.floor(Math.log(raw)/Math.LN10)), m = raw/p;
   return (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * p;
 }
+/* 配置比率の軸（§3）。基準3:1のサービスは 4.0:1〜1.0:1・基準線3.0。
+   基準の無いサービス（通所）は現在比率まわりに自動でとり、基準線は引かない。
+   rmax（薄い側）を左、rmin（手厚い側）を右にする（frac=0 が左、1 が右）。 */
+function ratioAxis(c){
+  var r = c && c.svc && c.svc.ratio;
+  if (!r) return null;
+  var base = r.std || null;
+  if (base) return { rmax: base + 1, rmin: 1.0, base: base };
+  var Rc = (c.ratioActual > 0) ? c.ratioActual : 3;
+  return { rmax: Math.max(Rc * 1.4, Rc + 1), rmin: Math.max(0.5, Rc * 0.6), base: null };
+}
+function ratioFrac(ax, R){
+  if (!ax || ax.rmax <= ax.rmin) return 0;
+  return Math.min(1, Math.max(0, (ax.rmax - R) / (ax.rmax - ax.rmin)));
+}
+function fracToRatio(ax, f){ return ax ? ax.rmax - f * (ax.rmax - ax.rmin) : 0; }
+
 function renderChart(c){
   var svg = $("chart");
   while (svg.firstChild) svg.removeChild(svg.firstChild);
-  var nCap = isFinite(c.nCap) ? c.nCap : c.n * 2;
-  var xs = [c.n, c.nmin, nCap, c.baseN, c.stdN, isFinite(c.nMinComp) ? c.nMinComp : 0]
-             .filter(function(v){ return v > 0 && isFinite(v); });
-  if (!xs.length) return;
-  var xmax = Math.max.apply(null, xs)*1.25 + 1;
-  var xmin = Math.max(0.4, Math.min.apply(null, xs)*0.55);
-  var ymax = Math.max(c.pool/xmin, c.atgt*1.35, 1);
+  var ax = ratioAxis(c);
   var PW = VB.w-VB.l-VB.r, PH = VB.h-VB.t-VB.b;
-  var X = function(v){ return VB.l + (v-xmin)/(xmax-xmin)*PW; };
+  if (!ax || !(c.coreN > 0) || !(c.pool > 0)){ view = null; return; }
+  view = { ax:ax, PW:PW };
+  /* 縦軸: 職員1人あたり給与費 B。薄い側（rmax）で最大、手厚い側（rmin）で最小。 */
+  var Bthin = ENGINE.bAtRatio(c, ax.rmax);
+  var ymax = Math.max(isFinite(Bthin) ? Bthin*1.12 : 0, c.atgt*1.35, c.B*1.15, 1);
+  var X = function(R){ return VB.l + ratioFrac(ax, R)*PW; };
   var Y = function(v){ return VB.t + PH - (v/ymax)*PH; };
-  view = {xmin:xmin, xmax:xmax, PW:PW};
   var i, step = niceStep(ymax/5);
   for (i = step; i <= ymax; i += step){
     svg.appendChild(el("line",{x1:VB.l,x2:VB.l+PW,y1:Y(i),y2:Y(i),stroke:"#DCE3E8","stroke-width":1}));
     svg.appendChild(el("text",{x:VB.l-9,y:Y(i)+4,"text-anchor":"end","font-size":10,fill:"#4A5C68","font-family":"ui-monospace,Menlo,monospace"}, String(Math.round(i))));
   }
-  var xstep = niceStep((xmax-xmin)/5);
-  for (i = Math.ceil(xmin/xstep)*xstep; i <= xmax; i += xstep){
-    svg.appendChild(el("text",{x:X(i),y:VB.t+PH+18,"text-anchor":"middle","font-size":10,fill:"#4A5C68","font-family":"ui-monospace,Menlo,monospace"}, String(Math.round(i))));
+  /* 横軸目盛り: 配置比率を整数刻みで（4:1, 3:1, 2:1, 1:1 …） */
+  var rlo = Math.ceil(ax.rmin), rhi = Math.floor(ax.rmax);
+  for (i = rlo; i <= rhi; i++){
+    svg.appendChild(el("text",{x:X(i),y:VB.t+PH+18,"text-anchor":"middle","font-size":10,fill:"#4A5C68","font-family":"ui-monospace,Menlo,monospace"}, i+":1"));
+  }
+  /* 基準割れ領域（基準線より左＝薄い側）を淡く塗る */
+  if (ax.base && ax.base < ax.rmax){
+    var xb = X(ax.base);
+    svg.appendChild(el("rect",{x:VB.l,y:VB.t,width:Math.max(0,xb-VB.l),height:PH,fill:"#B23A2E","fill-opacity":.05}));
   }
   svg.appendChild(el("line",{x1:VB.l,x2:VB.l+PW,y1:VB.t+PH,y2:VB.t+PH,stroke:"#101F2B","stroke-width":1.5}));
   svg.appendChild(el("line",{x1:VB.l,x2:VB.l,y1:VB.t,y2:VB.t+PH,stroke:"#101F2B","stroke-width":1.5}));
-  svg.appendChild(el("text",{x:VB.l,y:VB.t-6,"font-size":10.5,fill:"#4A5C68"},"平均年収（万円）"));
-  svg.appendChild(el("text",{x:VB.l+PW,y:VB.t+PH+36,"text-anchor":"end","font-size":10.5,fill:"#4A5C68"},"常勤換算数（人）"));
+  svg.appendChild(el("text",{x:VB.l,y:VB.t-6,"font-size":10.5,fill:"#4A5C68"},"職員1人あたり給与費（額面・万円）"));
+  svg.appendChild(el("text",{x:VB.l+PW,y:VB.t+PH+36,"text-anchor":"end","font-size":10.5,fill:"#4A5C68"},(c.svc.ratio.label||"配置比率")+"　薄い ← → 手厚い"));
 
-  function path(a,b){
+  /* 等原資曲線を配置比率で描く。B(R)=給与原資÷職員数(R)。核を薄く（Rを大きく）すると
+     職員が減り B は上がる。全域を破線、基準内かつ賃金下限以上の区間を太実線にする。 */
+  function seg(cond){
     var d = "", first = true;
-    for (var s = 0; s <= 90; s++){
-      var v = a + (b-a)*s/90;
-      if (v <= 0) continue;
-      var y = c.pool/v;
-      if (y > ymax*1.02){ first = true; continue; }
-      d += (first?"M":"L") + X(v).toFixed(1) + " " + Y(y).toFixed(1) + " ";
+    for (var s = 0; s <= 120; s++){
+      var f = s/120, R = fracToRatio(ax, f), y = ENGINE.bAtRatio(c, R);
+      var on = (y > 0 && y <= ymax*1.02) && (!cond || cond(R, y));
+      if (!on){ first = true; continue; }
+      d += (first?"M":"L") + X(R).toFixed(1) + " " + Y(y).toFixed(1) + " ";
       first = false;
     }
     return d;
   }
-  svg.appendChild(el("path",{d:path(xmin,xmax),fill:"none",stroke:"#9FB0BC","stroke-width":1.5,"stroke-dasharray":"3 3"}));
-  var lo = Math.max(c.nmin,xmin), hi = Math.min(nCap, xmax);
-  if (hi > lo) svg.appendChild(el("path",{d:path(lo,hi),fill:"none",stroke:"#2A7F72","stroke-width":4,"stroke-linecap":"round"}));
+  svg.appendChild(el("path",{d:seg(null),fill:"none",stroke:"#9FB0BC","stroke-width":1.5,"stroke-dasharray":"3 3"}));
+  /* 基準内（R<=基準）かつ 賃金下限以上（B>=atgt）。基準の無いサービスは賃金だけで判定 */
+  var okBand = seg(function(R, y){
+    return (!ax.base || R <= ax.base + 1e-9) && (!(c.atgt > 0) || y >= c.atgt - 1e-9);
+  });
+  if (okBand) svg.appendChild(el("path",{d:okBand,fill:"none",stroke:"#2A7F72","stroke-width":4,"stroke-linecap":"round"}));
+  else if (c.atgt > 0) svg.appendChild(el("text",{x:VB.l+PW/2,y:VB.t+PH/2,"text-anchor":"middle","font-size":13,fill:"#B23A2E","font-weight":"600"},"両立する区間なし"));
 
-  if (c.stdN > xmin && c.stdN < xmax){
-    svg.appendChild(el("line",{x1:X(c.stdN),x2:X(c.stdN),y1:VB.t,y2:VB.t+PH,stroke:"#8FA3B0","stroke-width":1,"stroke-dasharray":"2 4"}));
-    svg.appendChild(el("text",{x:X(c.stdN)+4,y:VB.t+PH-6,"font-size":10,fill:"#5A6B78"},"基準の単純合計 "+n1(c.stdN)));
+  /* 基準線（例: 3:1） */
+  if (ax.base && ax.base > ax.rmin && ax.base < ax.rmax){
+    svg.appendChild(el("line",{x1:X(ax.base),x2:X(ax.base),y1:VB.t,y2:VB.t+PH,stroke:"#B23A2E","stroke-width":1.4,"stroke-dasharray":"6 4"}));
+    svg.appendChild(el("text",{x:X(ax.base)+5,y:VB.t+12,"font-size":10.5,fill:"#B23A2E"},"基準 "+ax.base+" : 1"));
   }
-  if (isFinite(c.nMinComp) && c.nMinComp > xmin && c.nMinComp < xmax && Math.abs(c.nMinComp - c.nmin) > 0.05){
-    svg.appendChild(el("line",{x1:X(c.nMinComp),x2:X(c.nMinComp),y1:VB.t,y2:VB.t+PH,stroke:"#B23A2E","stroke-width":1.2,"stroke-dasharray":"4 3"}));
-    svg.appendChild(el("text",{x:X(c.nMinComp)+4,y:VB.t+PH-20,"font-size":10,fill:"#B23A2E"},"職種別基準 "+n1(c.nMinComp)));
-  }
-  if (c.nmin > xmin && c.nmin < xmax){
-    svg.appendChild(el("line",{x1:X(c.nmin),x2:X(c.nmin),y1:VB.t,y2:VB.t+PH,stroke:"#1B4965","stroke-width":1.4,"stroke-dasharray":"6 4"}));
-    svg.appendChild(el("text",{x:X(c.nmin)+5,y:VB.t+12,"font-size":10.5,fill:"#1B4965"},"配置下限 "+n1(c.nmin)+"人"));
-  }
+  /* 賃金下限（横線） */
   if (c.atgt > 0 && c.atgt < ymax){
     svg.appendChild(el("line",{x1:VB.l,x2:VB.l+PW,y1:Y(c.atgt),y2:Y(c.atgt),stroke:"#1B4965","stroke-width":1.4,"stroke-dasharray":"6 4"}));
     svg.appendChild(el("text",{x:VB.l+PW-4,y:Y(c.atgt)-6,"text-anchor":"end","font-size":10.5,fill:"#1B4965"},"賃金下限 "+n1(c.atgt)+"万円"));
   }
-  if (hi <= lo) svg.appendChild(el("text",{x:VB.l+PW/2,y:VB.t+PH/2,"text-anchor":"middle","font-size":13,fill:"#B23A2E","font-weight":"600"},"両立する区間なし"));
 
-  if (c.n > 0 && c.avg <= ymax){
-    var cx = X(c.n), cy = Y(c.avg);
+  /* いまの置き方の点（配置比率 × 職員1人あたり給与費 B） */
+  if (c.ratioActual > 0 && c.B > 0 && c.B <= ymax){
+    var cx = X(c.ratioActual), cy = Y(c.B);
     svg.appendChild(el("line",{x1:cx,x2:cx,y1:cy,y2:VB.t+PH,stroke:"#B8801F","stroke-width":1,"stroke-dasharray":"2 3"}));
     svg.appendChild(el("circle",{cx:cx,cy:cy,r:11,fill:"#B8801F","fill-opacity":.16}));
-    svg.appendChild(el("circle",{cx:cx,cy:cy,r:5.5,fill:"#B8801F",stroke:"#fff","stroke-width":2}));
+    svg.appendChild(el("circle",{cx:cx,cy:cy,r:5.5,fill:"#B8801F",stroke:"#fff","stroke-width":2,"data-o":"point"}));
     var right = cx > VB.l+PW*0.7;
     svg.appendChild(el("text",{x:cx+(right?-10:10),y:cy-16,"text-anchor":right?"end":"start","font-size":12,"font-weight":"600",fill:"#101F2B"},
-      n1(c.n)+"人 / "+n1(c.avg)+"万円"));
+      n2(c.ratioActual)+" : 1 / "+n1(c.B)+"万円"));
   }
 }
 
@@ -1064,30 +1120,31 @@ function makeText(c){
 
 /* ---------- 更新 ---------- */
 var last = null;
-/* 職員数スライダーの基準（つまみ位置の分母）。基準の単純合計 stdN を使い、
-   つまみは「現在の合計 ÷ 基準」を表す。基準が無い（0）ときは現在の合計を基準にする。 */
-function refTotal(c){ return (c && c.stdN > 0) ? c.stdN : (c ? c.baseN : 0); }
 
 function update(){
   var c = ENGINE.calcState(readInputs());
   last = c;
   if (!nminTouched) $("nmin").value = Math.round(c.nmin * 10) / 10;
-  /* つまみ位置＝現在の合計 ÷ 基準。確定後も現在の人数を反映し、中央へ戻らない。
-     range[0.4,1.8] に収める（実配置がそれを超えても表示上はクランプ）。 */
-  var refN = refTotal(c);
-  if (refN > 0) $("scale").value = Math.min(1.8, Math.max(0.4, c.baseN / refN));
+  /* つまみ位置＝現在の配置比率の軸上の割合。確定後も現在の比率を反映し、勝手に戻らない。 */
+  var ax = ratioAxis(c);
+  if (ax && c.ratioActual > 0) $("scale").value = ratioFrac(ax, c.ratioActual);
+  $("o-ratiobar").textContent = (c.ratioActual > 0) ? n2(c.ratioActual) : "–";
   renderNumbers(c); renderEmp(c); renderRatio(c);
   renderCompliance(c); renderVerdict(c); renderNeedRatio(c); renderAnchor(c); renderMarginal(c); renderTrend(c); renderChart(c);
   return c;
 }
 window.__SWMD_STATE = function(){ return last; };
 
-/* 職員数スライダー／曲線ドラッグの共通処理: 実配置を目標合計 target に比例配分で
-   畳む（scale は常に 1 のまま＝計算はスケールしない）。丸めない（構成比・nMinComp を
-   厳密に保つ）。per-row の 正規＋非正規＝合計 は n*s+hi*s=(n+hi)*s で厳密に成立する。 */
-function foldTo(target){
-  var cur = rows.reduce(function(s, r){ return s + r.n + (r.hi || 0); }, 0);
-  if (cur > 0 && target > 0){ rows = ENGINE.scaleRows(rows, target / cur); buildTable(); }
+/* 配置比率スライダー／曲線ドラッグの共通処理（§3）: 目標比率 R へ、介護・看護職員だけを
+   比例配分で畳む（その他職員は固定）。scale は常に 1 のまま。丸めない（介護:看護の比率と
+   各行内の正規/非正規/派遣の構成比を厳密に保つ）。計算は ENGINE.scaleCoreToRatio に委譲。 */
+function foldCoreTo(R){
+  var roles = (last && last.svc.ratio) ? last.svc.ratio.roles : [];
+  var users = last ? last.users : 0;
+  if (roles.length && users > 0 && R > 0){
+    rows = ENGINE.scaleCoreToRatio(rows, roles, users, R);
+    buildTable();
+  }
   update();
 }
 
@@ -1096,7 +1153,7 @@ function loadService(){
   sizes = {}; nminTouched = false; scale = 1;
   buildScaleFields();
   rows = ENGINE.initialRows(svcKey, sizes, num("week"));
-  $("scale").value = 1;
+  $("scale").value = 0.333;
   $("rev").value = svc.defRev;                             // 決算書からの実額入力（初期値はサンプル）
   $("total").value = Math.round(svc.defRev * svc.bench / 100);
   buildTable();
@@ -1122,7 +1179,11 @@ document.addEventListener("input", function(e){
     rows[+t.dataset.i][t.dataset.f] = parseFloat(t.value) || 0;
     update(); return;
   }
-  if (t.id === "scale"){ foldTo(parseFloat(t.value) * refTotal(last)); return; }
+  if (t.id === "scale"){
+    var ax = ratioAxis(last);
+    if (ax) foldCoreTo(fracToRatio(ax, parseFloat(t.value)));
+    return;
+  }
   if (t.id === "nmin"){ nminTouched = true; update(); return; }
   if (t.id === "atgt"){ atgtTouched = true; update(); return; }
   update();
@@ -1140,7 +1201,7 @@ document.addEventListener("click", function(e){
   }
   if (t.id === "reset-roles"){
     rows = ENGINE.initialRows(svcKey, sizes, num("week"));
-    scale = 1; $("scale").value = 1; buildTable(); update(); return;
+    scale = 1; $("scale").value = 0.333; buildTable(); update(); return;
   }
   if (t.id === "fill-std"){
     c = update();
@@ -1159,14 +1220,12 @@ document.addEventListener("click", function(e){
 (function(){
   var svg = $("chart"), dragging = false;
   function apply(ev){
-    if (!view) return;
+    if (!view || !view.ax) return;
     var box = svg.getBoundingClientRect();
     var px = (ev.clientX - box.left)/box.width*VB.w;
-    var v = view.xmin + (px - VB.l)/view.PW*(view.xmax - view.xmin);
-    var refN = refTotal(last);
-    if (refN <= 0) return;
-    /* 目標合計 v を [0.4,1.8]×基準 にクランプ（スライダーと同じ範囲）してから畳む。 */
-    foldTo(Math.min(1.8 * refN, Math.max(0.4 * refN, v)));
+    var f = Math.min(1, Math.max(0, (px - VB.l)/view.PW));
+    /* 横位置 f（0＝左＝薄い側）を配置比率 R に戻し、介護・看護だけを畳む。 */
+    foldCoreTo(fracToRatio(view.ax, f));
   }
   svg.addEventListener("pointerdown", function(e){ dragging = true; svg.setPointerCapture(e.pointerId); apply(e); });
   svg.addEventListener("pointermove", function(e){ if (dragging) apply(e); });
