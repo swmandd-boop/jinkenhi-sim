@@ -28,6 +28,6 @@ for (const bad of ["document", "window", "getElementById", "localStorage", "fetc
 writeFileSync(resolve(root, "engine.mjs"),
   "/* 自動生成 — 直接編集しないこと。生成元: jinkenhi-sim.html */\n" +
   block + "\n\nexport default ENGINE;\n" +
-  "export const { SERVICES, buildStandard, calcState, initialRows, annualMult } = ENGINE;\n");
+  "export const { SERVICES, buildStandard, calcState, initialRows, scaleRows, annualMult } = ENGINE;\n");
 
 console.log(`engine.mjs を生成しました（${block.split("\n").length} 行）`);

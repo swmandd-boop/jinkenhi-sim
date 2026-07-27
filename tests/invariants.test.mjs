@@ -157,6 +157,21 @@ test("INV-13 自動計算時は規模と収益が連動する", () => {
   }
 });
 
+/* ---- 敵対的レビュー指摘①: 老健の管理栄養士は入所定員で判定する ----
+   基準の文言は「入所定員100以上で1以上」。実利用者数 u（稼働率調整後）で
+   判定していたため、定員100・稼働92%（u=92）で基準0.0になり、過少配置を
+   助長していた。判定キーを sz.cap に変更した回帰テスト。 */
+test("RKN-01 老健の管理栄養士は実利用者数でなく入所定員で判定する", () => {
+  for (const occ of [80, 90, 92, 100]) {
+    const c = run("roken", { sizes: { cap: 100, occ } });
+    const eiyou = c.rows.find(r => r.key === "eiyou");
+    assert.ok(eiyou.std >= 1, `定員100・稼働${occ}%: 栄養士 std=${eiyou.std}（1以上のはず）`);
+  }
+  const c99 = run("roken", { sizes: { cap: 99, occ: 100 } });
+  const e99 = c99.rows.find(r => r.key === "eiyou");
+  assert.equal(e99.std, 0, `定員99: 栄養士 std=${e99.std}（0のはず）`);
+});
+
 /* ---- 不変条件14: 負の値・ゼロ入力で NaN を出さない ---- */
 test("INV-14 極端な入力でも数値が壊れない", () => {
   const cases = [

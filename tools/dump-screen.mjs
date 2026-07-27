@@ -94,7 +94,8 @@ click("use-std");
 shots.push(snapshot("08 「基準を満たす最小に戻す」を押す"));
 
 setVal("scale", 1.6);
-shots.push(snapshot("09 職員数スライダーを1.6倍に"));
+fire(d.getElementById("scale"), "change"); // スライダーを離す＝倍率を実配置に確定
+shots.push(snapshot("09 職員数スライダーを1.6倍に（離して確定）"));
 
 d.getElementById("mode-direct").click();
 shots.push(snapshot("10 原資を「人件費総額を直接」に切り替え"));

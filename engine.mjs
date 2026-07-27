@@ -99,7 +99,7 @@ var SERVICES = {
         {key:"soudan",name:"支援相談員",         std:Math.max(1,CEIL(u/100)), a:W.soudan, note:"1以上（100:1）"},
         {key:"pt",    name:"PT・OT・ST",         std:Math.max(1,u/100), a:W.pt, note:"入所者100人に1以上"},
         {key:"cm",    name:"介護支援専門員",     std:Math.max(1,CEIL(u/100)), a:W.cm, note:"1以上（100:1）"},
-        {key:"eiyou", name:"管理栄養士・栄養士", std:u>=100?1:0, a:W.eiyou, note:"入所定員100以上で1以上"},
+        {key:"eiyou", name:"管理栄養士・栄養士", std:(s.cap>=100)?1:0, a:W.eiyou, note:"入所定員100以上で1以上"},
         {key:"yakuzai",name:"薬剤師",            std:0.2, a:W.yakuzai, note:"実情に応じた適当数"},
         {key:"chouri",name:"調理員・その他",     std:0, a:W.chouri, note:"基準なし。給食委託なら0"},
         {key:"jimu",  name:"事務職員",           std:0, a:W.jimu, note:"基準なし"}
@@ -288,10 +288,25 @@ var SERVICES = {
     });
   }
 
+  /* 職員数スライダーの倍率を実配置（正規・非正規）に書き戻す。
+     scale を残して未スケール値（入力列）とスケール後の値（合計列）を同時に
+     画面へ出すと「正規計＋非正規計 ≠ 合計」の矛盾になるため、離した時点で
+     ここに畳んで scale を 1 に戻す。常勤換算の粒度に合わせ 0.1 人単位で丸める。 */
+  function scaleRows(rows, scale){
+    var s = (scale > 0) ? scale : 1;
+    return rows.map(function(r){
+      var o = {}; for (var k in r) o[k] = r[k];
+      o.n  = Math.round((r.n  || 0) * s * 10) / 10;
+      o.hi = Math.round((r.hi || 0) * s * 10) / 10;
+      return o;
+    });
+  }
+
   return { W:W, SERVICES:SERVICES, buildStandard:buildStandard,
-           calcState:calcState, initialRows:initialRows, annualMult:annualMult };
+           calcState:calcState, initialRows:initialRows,
+           scaleRows:scaleRows, annualMult:annualMult };
 })();
 /* ===== SWMD-ENGINE:END ===== */
 
 export default ENGINE;
-export const { SERVICES, buildStandard, calcState, initialRows, annualMult } = ENGINE;
+export const { SERVICES, buildStandard, calcState, initialRows, scaleRows, annualMult } = ENGINE;
