@@ -56,14 +56,8 @@ test("UI-03 定員だけ増やすと職種別未達が検出される", () => {
   assert.ok(t.txt("#compliance h3").includes("満たしています"), t.txt("#compliance h3"));
 });
 
-/* 自動計算のオンオフで収益欄の状態が正しく切り替わる */
-test("UI-04 規模連動中は収益欄が読み取り専用になる", () => {
-  const t = open();
-  assert.equal(t.d.getElementById("rev").readOnly, true);
-  const cb = t.d.getElementById("auto-rev"); cb.checked = false;
-  cb.dispatchEvent(new (t.d.defaultView.Event)("input", { bubbles: true }));
-  assert.equal(t.d.getElementById("rev").readOnly, false);
-});
+/* UI-04（規模連動中は収益欄が読み取り専用）は STEP2 再設計で削除。autoRev（規模から収益を
+   概算）を廃し、収益は常に実額入力（読み取り専用にしない）ため、この挙動自体が無くなった。 */
 
 /* 全サービスで起動時に例外が出ない */
 test("UI-05 全サービスの切り替えで画面が壊れない", () => {

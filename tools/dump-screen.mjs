@@ -90,8 +90,8 @@ shots.push(snapshot("04 定員だけ100に変更（構成は据え置き＝基�
 click("fill-std");
 shots.push(snapshot("05 「不足職種を基準まで埋める」を押す"));
 
-setVal("ratio", 39.4);
-shots.push(snapshot("06 人件費率を39.4に下げる（両立しない領域へ）"));
+setVal("total", 18000);
+shots.push(snapshot("06 人件費総額を18,000に下げる（人件費率が下がり両立しない領域へ）"));
 
 setVal("nmin", 30);
 shots.push(snapshot("07 配置下限を手入力30に下げる（自動追従を切る）"));
@@ -103,10 +103,9 @@ setVal("scale", 1.6);
 fire(d.getElementById("scale"), "change"); // スライダーを離す＝倍率を実配置に確定
 shots.push(snapshot("09 職員数スライダーを1.6倍に（離して確定）"));
 
-d.getElementById("mode-direct").click();
-shots.push(snapshot("10 原資を「人件費総額を直接」に切り替え"));
+setVal("rev", 52000);
+shots.push(snapshot("10 収益を52,000に増やす（人件費率が下がる＝出力が連動）"));
 
-d.getElementById("mode-ratio").click();
 selectService("unit");
 shots.push(snapshot("11 ユニット型に切り替え"));
 

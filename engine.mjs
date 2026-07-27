@@ -23,7 +23,6 @@ var SERVICES = {
 
   tokuyou: {
     name:"介護老人福祉施設（従来型）", defRev:37000,
-    priceBasis:"day", unitPrice:13200, priceLabel:"入所者1人1日あたり収入", annualDays:function(s){ return 365; },
     bench:64.3, benchNote:"全サービス平均を暫定適用（サービス別実数は未取得）",
     note:"入所者3人に対し介護・看護職員1人以上（常勤換算）。看護職員は入所者数に応じた段階配置。",
     fields:[{k:"cap",label:"入所定員",unit:"人",val:80,step:1},
@@ -51,7 +50,6 @@ var SERVICES = {
 
   unit: {
     name:"介護老人福祉施設（ユニット型）", defRev:37000,
-    priceBasis:"day", unitPrice:13200, priceLabel:"入所者1人1日あたり収入", annualDays:function(s){ return 365; },
     bench:64.3, benchNote:"全サービス平均を暫定適用（サービス別実数は未取得）",
     note:"3:1に加え、日中は1ユニットに常時1人以上、夜間は2ユニットに1人以上。ユニット常時配置のほうが3:1より重くなる場合があります。",
     fields:[{k:"cap",label:"入所定員",unit:"人",val:80,step:1},
@@ -83,7 +81,6 @@ var SERVICES = {
 
   roken: {
     name:"介護老人保健施設", defRev:48000,
-    priceBasis:"day", unitPrice:14300, priceLabel:"入所者1人1日あたり収入", annualDays:function(s){ return 365; },
     bench:64.3, benchNote:"全サービス平均を暫定適用（サービス別実数は未取得）",
     note:"看護・介護で3:1、うち看護2/7・介護5/7が標準。医師は入所者100人に1人以上（常勤1以上）。",
     fields:[{k:"cap",label:"入所定員",unit:"人",val:100,step:1},
@@ -110,7 +107,6 @@ var SERVICES = {
 
   tsuusho: {
     name:"通所介護", defRev:7700,
-    priceBasis:"day", unitPrice:8010, priceLabel:"利用者1人1日あたり収入", annualDays:function(s){ return (s.days || 6) * 52; },
     bench:64.3, benchNote:"全サービス平均を暫定適用（サービス別実数は未取得）",
     note:"介護職員は利用者15人まで1以上、15人を超える部分は5人ごとに1を加えた数を、提供時間帯を通じて配置。常勤換算への換算は営業日数と提供時間に左右されます。",
     fields:[{k:"cap",label:"1日あたり利用定員",unit:"人",val:35,step:1},
@@ -137,12 +133,8 @@ var SERVICES = {
 
 };
   /* ---------- 純粋な計算 ---------- */
-  function annualMult(svc, sizes, week){
-    if (svc.priceBasis !== "day") return 12;
-    var s = {}; for (var k in sizes) s[k] = sizes[k];
-    s.week = week;
-    return svc.annualDays(s);
-  }
+  /* 年間稼働日数（出力の「1人1日あたり収入」に使う）。通所は営業日数×52週、入所系は365。 */
+  function opDaysOf(sizes){ return (sizes && sizes.days != null) ? sizes.days * 52 : 365; }
 
   function buildStandard(svcKey, sizes, week){
     var s = {}; for (var k in sizes) s[k] = sizes[k];
@@ -151,9 +143,9 @@ var SERVICES = {
   }
 
   /* 入力 I（DOM非依存）から、画面に出す全数値を計算して返す。
-     I = { service, sizes, week, mode, autoRev, price, rev, ratio, total,
-           fuku, bonus, hiW, scale, nminAuto, nminManual, atgt,
-           rows:[{key,name,note,n,hi,a}] }                            */
+     収益 rev・人件費総額 total はともに決算書からの実額入力。人件費率は total/rev で出力する。
+     I = { service, sizes, week, rev, total, fuku, bonus, hiW,
+           scale, nminAuto, nminManual, atgt, g, rows:[{key,name,note,n,hi}] } */
   function calcState(I){
     var svc = SERVICES[I.service];
     var sz = {}; for (var q in I.sizes) sz[q] = I.sizes[q];
@@ -175,12 +167,11 @@ var SERVICES = {
       };
     });
 
-    /* 原資 */
-    var rev = (I.autoRev && I.mode === "ratio")
-      ? users * I.price * annualMult(svc, I.sizes, I.week) / 10000
-      : I.rev;
-    var total = (I.mode === "ratio") ? rev * I.ratio / 100 : I.total;
+    /* 原資（収益・人件費総額ともに決算書からの実額入力）。人件費率は割り算で出力する。 */
+    var rev = I.rev, total = I.total;
     var pool  = total / (1 + I.fuku / 100);
+    var opDays  = opDaysOf(sz);
+    var unitRev = (users > 0 && opDays > 0) ? rev * 10000 / (users * opDays) : 0; // 円/人/日（出力）
 
     /* 人数と賃金
        v0.4: 職種別の基準年収を廃止。給与原資 pool を全員に均一に配り、非正規は
@@ -236,9 +227,10 @@ var SERVICES = {
     /* 必要人件費率（新機能A）: 譲れない線（配置下限×下回れない平均年収）を守るのに
        必要な人件費率。閾値は置かず符号だけで分岐する。rev>0・atgt>0 で feasible と等価。 */
     var needRatioV = rev > 0 ? needTotal / rev * 100 : 0;
-    var needRevV   = I.ratio > 0 ? needTotal / (I.ratio / 100) : 0;
+    /* 人件費率（＝effRatio）を変えずに必要総額を賄うのに要る年間収益。 */
+    var needRevV   = effRatio > 0 ? needTotal / (effRatio / 100) : 0;
     var gapPt   = needRatioV - effRatio;              // >0 なら人件費の内側で解けない
-    var gapRev  = (rev > 0 && I.ratio > 0) ? needRevV - rev : 0; // 収入をいくら増やすか
+    var gapRev  = (rev > 0 && effRatio > 0) ? needRevV - rev : 0; // 収入をいくら増やすか
     var gapCutN = isFinite(nCap) ? n - nCap : 0;       // 常勤換算を何人減らすか
 
     /* 推移（新機能C）: 現行の賃金カーブ（1人あたり人件費の年上昇率 g）を維持した場合の
@@ -276,7 +268,7 @@ var SERVICES = {
       needMoreTotal: needMoreTotal,
       cutN: (avg + up) > 0 ? n - pool / (avg + up) : 0,
       ptUp: rev > 0 ? needMoreTotal / rev * 100 : 0,
-      revUp: I.ratio > 0 ? needMoreTotal / (I.ratio / 100) : 0,
+      revUp: effRatio > 0 ? needMoreTotal / (effRatio / 100) : 0,
       hiNow: hiNow * 100, hiNew: hiNew * 100,
       dN: Cnew > 0 ? n * (Cnow / Cnew - 1) : 0,
       dAvgSe: avgSe2 - avgSe
@@ -284,9 +276,9 @@ var SERVICES = {
 
     return {
       service:I.service, svcName:svc.name, svc:svc, sizes:I.sizes, week:I.week,
-      mode:I.mode, autoRev:I.autoRev, price:I.price, scale:scale,
-      fuku:I.fuku, bonus:I.bonus, hw:hw, ratioIn:I.ratio, atgt:I.atgt,
-      rev:rev, total:total, pool:pool, effRatio:effRatio,
+      scale:scale,
+      fuku:I.fuku, bonus:I.bonus, hw:hw, atgt:I.atgt,
+      rev:rev, total:total, pool:pool, effRatio:effRatio, unitRev:unitRev,
       rows:rows, baseS:baseS, baseH:baseH, baseN:baseN, stdN:stdN,
       n:n, nSe:nSe, nHi:nHi, hiRate: n > 0 ? nHi / n * 100 : 0,
       avg:avg, avgSe:avgSe, avgHi:avgHi, perHead: avg * (1 + I.fuku / 100),
@@ -334,10 +326,9 @@ var SERVICES = {
   }
 
   return { W:W, SERVICES:SERVICES, buildStandard:buildStandard,
-           calcState:calcState, initialRows:initialRows,
-           scaleRows:scaleRows, annualMult:annualMult };
+           calcState:calcState, initialRows:initialRows, scaleRows:scaleRows };
 })();
 /* ===== SWMD-ENGINE:END ===== */
 
 export default ENGINE;
-export const { SERVICES, buildStandard, calcState, initialRows, scaleRows, annualMult } = ENGINE;
+export const { SERVICES, buildStandard, calcState, initialRows, scaleRows } = ENGINE;

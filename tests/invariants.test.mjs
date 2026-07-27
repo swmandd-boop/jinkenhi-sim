@@ -127,17 +127,9 @@ test("INV-12 成立判定と下限・上限の関係が整合する", () => {
   }
 });
 
-/* ---- 不変条件13: 規模を変えると収益が連動する（自動計算時） ---- */
-test("INV-13 自動計算時は規模と収益が連動する", () => {
-  for (const s of ALL) {
-    const a = run(s);
-    const key = s === "tsuusho" ? "cap" : "cap";
-    const I = makeInput(s);
-    const b = calcState({ ...I, sizes: { ...I.sizes, [key]: I.sizes[key] * 2 } });
-    assert.ok(b.rev > a.rev * 1.9, `${s} rev ${a.rev} -> ${b.rev}`);
-    assert.ok(b.users > a.users * 1.9, s);
-  }
-});
+/* INV-13（自動計算時は規模と収益が連動）は STEP2 再設計で削除。収益は決算書からの実額入力に
+   なり、規模には自動連動しない（規模変更時は収益も見直す、と画面で促す）。
+   規模と利用者数の連動そのものは users=cap×occ/100 として INV-14/explore が触れる。 */
 
 /* ---- 不変条件15（v0.4新式）: 正規payroll＋非正規payroll＝給与原資 ---- */
 test("INV-15 正規payroll＋非正規payroll＝給与原資（恒等式）", () => {
@@ -204,16 +196,40 @@ test("RKN-01 老健の管理栄養士は実利用者数でなく入所定員で�
   assert.equal(e99.std, 0, `定員99: 栄養士 std=${e99.std}（0のはず）`);
 });
 
+/* ---- STEP2 再設計: 人件費率は入力ではなく total/rev の出力である ----
+   収益と人件費総額を独立に入力し、率が割り算で出ること。収益0で NaN/Infinity を出さないこと。
+   （旧設計は率が入力で effRatio が入力をそのまま返す循環になっていた） */
+test("STEP2-01 人件費率 = 人件費総額 ÷ 収益（出力）", () => {
+  for (const s of ALL) {
+    for (const rev of [1000, 37000, 90000]) {
+      for (const total of [500, 23791, 60000]) {
+        const c = calcState(makeInput(s, { rev, total }));
+        assert.ok(near(c.effRatio, total / rev * 100), `${s} rev=${rev} total=${total}: effRatio=${c.effRatio}`);
+      }
+    }
+  }
+});
+
+test("STEP2-02 収益0でも人件費率・単価が NaN/Infinity にならない", () => {
+  for (const s of ALL) {
+    const c = calcState(makeInput(s, { rev: 0, total: 23791 }));
+    assert.ok(Number.isFinite(c.effRatio) && c.effRatio === 0, `${s}: effRatio=${c.effRatio}`);
+    assert.ok(Number.isFinite(c.unitRev) && c.unitRev === 0, `${s}: unitRev=${c.unitRev}`);
+    for (const [k, v] of Object.entries(c)) if (typeof v === "number") assert.ok(!Number.isNaN(v), `${s} ${k}=NaN`);
+  }
+});
+
 /* ---- 不変条件18（v0.4新機能A）: 必要人件費率の符号と成立判定が一致 ----
-   gapPt = needRatio - effRatio。rev>0・atgt>0 のとき gapPt<=0 ⇔ feasible。 */
+   gapPt = needRatio - effRatio。rev>0・atgt>0 のとき gapPt<=0 ⇔ feasible。
+   effRatio は total/rev で決まるので、total を振って人件費率を変える。 */
 test("INV-18 gapPt<=0 と feasible が一致（rev>0・atgt>0）", () => {
   for (const s of ALL) {
     for (const atgt of [200, 400, 700]) {
-      for (const ratio of [40, 64.3, 90]) {
-        const c = calcState(makeInput(s, { atgt, ratio }));
+      for (const total of [12000, 23791, 40000]) {
+        const c = calcState(makeInput(s, { atgt, total }));
         if (c.rev > 0 && atgt > 0) {
           assert.equal(c.gapPt <= 1e-9, c.feasible,
-            `${s} atgt=${atgt} ratio=${ratio}: gapPt=${c.gapPt} feasible=${c.feasible}`);
+            `${s} atgt=${atgt} total=${total}: gapPt=${c.gapPt} feasible=${c.feasible}`);
         }
       }
     }

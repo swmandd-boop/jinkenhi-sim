@@ -124,36 +124,20 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
       </div>
       <div id="scale-fields"></div>
       <p class="hint" id="svc-note"></p>
+      <p class="hint"><b>定員や稼働率を変えたときは、年間サービス活動収益（STEP2）も見直してください。</b>収益は決算書からの実額で、規模の入力に自動連動はしません。</p>
     </section>
 
     <section class="panel">
       <h2>原資を決める<span class="tag">STEP 2</span></h2>
-      <div class="seg" role="group" aria-label="原資の決め方">
-        <button id="mode-ratio" aria-pressed="true">収益 × 人件費率</button>
-        <button id="mode-direct" aria-pressed="false">人件費総額を直接</button>
+      <div class="field">
+        <label for="rev">年間サービス活動収益</label>
+        <div class="inline"><input type="number" id="rev" value="37000" step="100" min="0"><span class="unit">万円</span><span class="samp">初期値はサンプル・未検証</span></div>
+        <p class="hint"><b>決算書から転記してください。</b>介護報酬・利用者負担・加算等を含む年間の事業収益です。</p>
       </div>
-      <div id="ratio-fields">
-        <label class="chk"><input type="checkbox" id="auto-rev" checked> STEP1の規模から収益を概算する</label>
-        <div class="field" id="price-field">
-          <label for="price" id="price-label">1人1日あたり収入</label>
-          <div class="inline"><input type="number" id="price" value="13200" step="100" min="0"><span class="unit">円</span><span class="samp">初期値はサンプル・未検証</span></div>
-          <p class="hint" id="price-hint"></p>
-        </div>
-        <div class="field">
-          <label for="rev">年間サービス活動収益</label>
-          <div class="inline"><input type="number" id="rev" value="37000" step="100" min="0"><span class="unit">万円</span></div>
-        </div>
-        <div class="field">
-          <label for="ratio">人件費率（給与費 ÷ 収入）</label>
-          <div class="inline"><input type="number" id="ratio" value="64.3" step="0.1" min="0" max="100"><span class="unit">％</span><span class="samp">初期値はサンプル・要実額</span></div>
-          <p class="hint" id="bench"></p>
-        </div>
-      </div>
-      <div id="direct-fields" hidden>
-        <div class="field">
-          <label for="total">年間人件費総額（法定福利費込み）</label>
-          <div class="inline"><input type="number" id="total" value="23791" step="100" min="0"><span class="unit">万円</span></div>
-        </div>
+      <div class="field">
+        <label for="total">年間人件費総額（法定福利費込み）</label>
+        <div class="inline"><input type="number" id="total" value="23791" step="100" min="0"><span class="unit">万円</span><span class="samp">初期値はサンプル・未検証</span></div>
+        <p class="hint"><b>決算書から転記してください。</b>給与費に事業主負担の法定福利費を含めた総額です。</p>
       </div>
       <div class="field">
         <label for="fuku">法定福利費・退職共済等の事業主負担率</label>
@@ -164,9 +148,10 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
         <div class="inline"><input type="number" id="bonus" value="4.0" step="0.1" min="0"><span class="unit">ヶ月</span></div>
       </div>
       <div class="readout">
-        <div class="row"><span class="k">人件費総額</span><span class="v" id="o-total">–</span></div>
-        <div class="row lead"><span class="k">給与原資（賞与含む）</span><span class="v" id="o-wagepool">–</span></div>
-        <div class="row"><span class="k">実質人件費率</span><span class="v" id="o-ratio">–</span></div>
+        <div class="row"><span class="k">給与原資（賞与含む）</span><span class="v" id="o-wagepool">–</span></div>
+        <div class="row lead"><span class="k">人件費率（人件費総額 ÷ 収益）</span><span class="v" id="o-ratio">–</span></div>
+        <div class="row"><span class="k">　参考（全サービス平均）</span><span class="v" id="bench">–</span></div>
+        <div class="row"><span class="k">1人1日あたり収入（＝収益÷利用者数÷稼働日数）</span><span class="v" id="o-unitrev">–</span></div>
       </div>
     </section>
 
@@ -293,11 +278,11 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
         <li>したがって表示される人件費率は「加算込みの給与費割合」であり、介護事業経営概況調査の給与費割合と同じ土俵の数字です。</li>
         <li>一方で、加算相当分は<b>賃金への充当義務がある収入</b>です。給与原資のうち一定額は配分の自由度がありません。制度設計の議論では、加算実績額を別途拾って「自由に配分できる原資」を確認する必要があります。</li>
       </ul>
-      <h4>規模と収益の連動</h4>
+      <h4>収益・人件費総額・人件費率</h4>
       <ul>
-        <li>「STEP1の規模から収益を概算する」を入れている間は、<b>年間収益＝利用者数×単価×年間稼働日数</b>で自動計算します。定員や稼働率を動かせば収益も動くので、規模と原資の整合が取れます。</li>
-        <li>チェックを外すと収益は手入力になります。決算書の実額を入れる場合はこちらです。<b>ただし手入力のまま定員だけを変えると、規模と収益が食い違ったまま曲線が描かれます。</b></li>
-        <li>単価の初期値は各サービスの平均的な規模から逆算した値で、<b>未検証のサンプル</b>です。地域区分・要介護度構成・加算・通所介護の規模区分で大きく変わります。</li>
+        <li>年間サービス活動収益と年間人件費総額は、<b>どちらも決算書からの実額</b>を入れます。人件費率はこの2つの割り算（人件費総額÷収益）で<b>出力</b>し、全サービス平均64.3％と比べられます。率を入力しないので「入力した率がそのまま返る」循環になりません。</li>
+        <li>収益は規模（定員・稼働率）に<b>自動連動しません</b>。定員や稼働率を変えたときは、年間サービス活動収益も決算書の実額で見直してください。</li>
+        <li>「1人1日あたり収入」は<b>出力</b>（収益÷利用者数÷年間稼働日数）で、水準の良し悪しは判定しません。地域区分・要介護度構成・加算・規模区分で大きく変わります。</li>
       </ul>
       <h4>合計人数では基準充足を判定できません</h4>
       <ul>
@@ -368,7 +353,6 @@ var SERVICES = {
 
   tokuyou: {
     name:"介護老人福祉施設（従来型）", defRev:37000,
-    priceBasis:"day", unitPrice:13200, priceLabel:"入所者1人1日あたり収入", annualDays:function(s){ return 365; },
     bench:64.3, benchNote:"全サービス平均を暫定適用（サービス別実数は未取得）",
     note:"入所者3人に対し介護・看護職員1人以上（常勤換算）。看護職員は入所者数に応じた段階配置。",
     fields:[{k:"cap",label:"入所定員",unit:"人",val:80,step:1},
@@ -396,7 +380,6 @@ var SERVICES = {
 
   unit: {
     name:"介護老人福祉施設（ユニット型）", defRev:37000,
-    priceBasis:"day", unitPrice:13200, priceLabel:"入所者1人1日あたり収入", annualDays:function(s){ return 365; },
     bench:64.3, benchNote:"全サービス平均を暫定適用（サービス別実数は未取得）",
     note:"3:1に加え、日中は1ユニットに常時1人以上、夜間は2ユニットに1人以上。ユニット常時配置のほうが3:1より重くなる場合があります。",
     fields:[{k:"cap",label:"入所定員",unit:"人",val:80,step:1},
@@ -428,7 +411,6 @@ var SERVICES = {
 
   roken: {
     name:"介護老人保健施設", defRev:48000,
-    priceBasis:"day", unitPrice:14300, priceLabel:"入所者1人1日あたり収入", annualDays:function(s){ return 365; },
     bench:64.3, benchNote:"全サービス平均を暫定適用（サービス別実数は未取得）",
     note:"看護・介護で3:1、うち看護2/7・介護5/7が標準。医師は入所者100人に1人以上（常勤1以上）。",
     fields:[{k:"cap",label:"入所定員",unit:"人",val:100,step:1},
@@ -455,7 +437,6 @@ var SERVICES = {
 
   tsuusho: {
     name:"通所介護", defRev:7700,
-    priceBasis:"day", unitPrice:8010, priceLabel:"利用者1人1日あたり収入", annualDays:function(s){ return (s.days || 6) * 52; },
     bench:64.3, benchNote:"全サービス平均を暫定適用（サービス別実数は未取得）",
     note:"介護職員は利用者15人まで1以上、15人を超える部分は5人ごとに1を加えた数を、提供時間帯を通じて配置。常勤換算への換算は営業日数と提供時間に左右されます。",
     fields:[{k:"cap",label:"1日あたり利用定員",unit:"人",val:35,step:1},
@@ -482,12 +463,8 @@ var SERVICES = {
 
 };
   /* ---------- 純粋な計算 ---------- */
-  function annualMult(svc, sizes, week){
-    if (svc.priceBasis !== "day") return 12;
-    var s = {}; for (var k in sizes) s[k] = sizes[k];
-    s.week = week;
-    return svc.annualDays(s);
-  }
+  /* 年間稼働日数（出力の「1人1日あたり収入」に使う）。通所は営業日数×52週、入所系は365。 */
+  function opDaysOf(sizes){ return (sizes && sizes.days != null) ? sizes.days * 52 : 365; }
 
   function buildStandard(svcKey, sizes, week){
     var s = {}; for (var k in sizes) s[k] = sizes[k];
@@ -496,9 +473,9 @@ var SERVICES = {
   }
 
   /* 入力 I（DOM非依存）から、画面に出す全数値を計算して返す。
-     I = { service, sizes, week, mode, autoRev, price, rev, ratio, total,
-           fuku, bonus, hiW, scale, nminAuto, nminManual, atgt,
-           rows:[{key,name,note,n,hi,a}] }                            */
+     収益 rev・人件費総額 total はともに決算書からの実額入力。人件費率は total/rev で出力する。
+     I = { service, sizes, week, rev, total, fuku, bonus, hiW,
+           scale, nminAuto, nminManual, atgt, g, rows:[{key,name,note,n,hi}] } */
   function calcState(I){
     var svc = SERVICES[I.service];
     var sz = {}; for (var q in I.sizes) sz[q] = I.sizes[q];
@@ -520,12 +497,11 @@ var SERVICES = {
       };
     });
 
-    /* 原資 */
-    var rev = (I.autoRev && I.mode === "ratio")
-      ? users * I.price * annualMult(svc, I.sizes, I.week) / 10000
-      : I.rev;
-    var total = (I.mode === "ratio") ? rev * I.ratio / 100 : I.total;
+    /* 原資（収益・人件費総額ともに決算書からの実額入力）。人件費率は割り算で出力する。 */
+    var rev = I.rev, total = I.total;
     var pool  = total / (1 + I.fuku / 100);
+    var opDays  = opDaysOf(sz);
+    var unitRev = (users > 0 && opDays > 0) ? rev * 10000 / (users * opDays) : 0; // 円/人/日（出力）
 
     /* 人数と賃金
        v0.4: 職種別の基準年収を廃止。給与原資 pool を全員に均一に配り、非正規は
@@ -581,9 +557,10 @@ var SERVICES = {
     /* 必要人件費率（新機能A）: 譲れない線（配置下限×下回れない平均年収）を守るのに
        必要な人件費率。閾値は置かず符号だけで分岐する。rev>0・atgt>0 で feasible と等価。 */
     var needRatioV = rev > 0 ? needTotal / rev * 100 : 0;
-    var needRevV   = I.ratio > 0 ? needTotal / (I.ratio / 100) : 0;
+    /* 人件費率（＝effRatio）を変えずに必要総額を賄うのに要る年間収益。 */
+    var needRevV   = effRatio > 0 ? needTotal / (effRatio / 100) : 0;
     var gapPt   = needRatioV - effRatio;              // >0 なら人件費の内側で解けない
-    var gapRev  = (rev > 0 && I.ratio > 0) ? needRevV - rev : 0; // 収入をいくら増やすか
+    var gapRev  = (rev > 0 && effRatio > 0) ? needRevV - rev : 0; // 収入をいくら増やすか
     var gapCutN = isFinite(nCap) ? n - nCap : 0;       // 常勤換算を何人減らすか
 
     /* 推移（新機能C）: 現行の賃金カーブ（1人あたり人件費の年上昇率 g）を維持した場合の
@@ -621,7 +598,7 @@ var SERVICES = {
       needMoreTotal: needMoreTotal,
       cutN: (avg + up) > 0 ? n - pool / (avg + up) : 0,
       ptUp: rev > 0 ? needMoreTotal / rev * 100 : 0,
-      revUp: I.ratio > 0 ? needMoreTotal / (I.ratio / 100) : 0,
+      revUp: effRatio > 0 ? needMoreTotal / (effRatio / 100) : 0,
       hiNow: hiNow * 100, hiNew: hiNew * 100,
       dN: Cnew > 0 ? n * (Cnow / Cnew - 1) : 0,
       dAvgSe: avgSe2 - avgSe
@@ -629,9 +606,9 @@ var SERVICES = {
 
     return {
       service:I.service, svcName:svc.name, svc:svc, sizes:I.sizes, week:I.week,
-      mode:I.mode, autoRev:I.autoRev, price:I.price, scale:scale,
-      fuku:I.fuku, bonus:I.bonus, hw:hw, ratioIn:I.ratio, atgt:I.atgt,
-      rev:rev, total:total, pool:pool, effRatio:effRatio,
+      scale:scale,
+      fuku:I.fuku, bonus:I.bonus, hw:hw, atgt:I.atgt,
+      rev:rev, total:total, pool:pool, effRatio:effRatio, unitRev:unitRev,
       rows:rows, baseS:baseS, baseH:baseH, baseN:baseN, stdN:stdN,
       n:n, nSe:nSe, nHi:nHi, hiRate: n > 0 ? nHi / n * 100 : 0,
       avg:avg, avgSe:avgSe, avgHi:avgHi, perHead: avg * (1 + I.fuku / 100),
@@ -679,8 +656,7 @@ var SERVICES = {
   }
 
   return { W:W, SERVICES:SERVICES, buildStandard:buildStandard,
-           calcState:calcState, initialRows:initialRows,
-           scaleRows:scaleRows, annualMult:annualMult };
+           calcState:calcState, initialRows:initialRows, scaleRows:scaleRows };
 })();
 /* ===== SWMD-ENGINE:END ===== */
 
@@ -693,7 +669,7 @@ var SERVICES = {
 "use strict";
 
 var S = ENGINE.SERVICES;
-var svcKey = "tokuyou", mode = "ratio", autoRev = true, nminTouched = false, atgtTouched = false;
+var svcKey = "tokuyou", nminTouched = false, atgtTouched = false;
 var scale = 1, sizes = {}, rows = [];
 
 var $ = function(id){ return document.getElementById(id); };
@@ -713,8 +689,7 @@ function pct(v){ return v.toFixed(1) + " ％"; }
 function readInputs(){
   return {
     service:svcKey, sizes:sizes, week:num("week"),
-    mode:mode, autoRev:autoRev,
-    price:num("price"), rev:num("rev"), ratio:num("ratio"), total:num("total"),
+    rev:num("rev"), total:num("total"),
     fuku:num("fuku"), bonus:num("bonus"), hiW:num("hi-w"),
     scale:scale, nminAuto:!nminTouched, nminManual:num("nmin"), atgt:num("atgt"),
     g:num("g"),
@@ -733,14 +708,6 @@ function buildScaleFields(){
   });
   $("scale-fields").innerHTML = html;
   $("svc-note").textContent = svc.note;
-}
-
-function priceHintText(){
-  var svc = S[svcKey];
-  return (svc.priceBasis === "day"
-      ? "年間収益＝利用者数 × 単価 × 年間稼働日数（" + ENGINE.annualMult(svc, sizes, num("week")) + "日）。"
-      : "年間収益＝利用者数 × 単価 × 12か月。")
-    + "地域区分・要介護度構成・加算・規模区分で大きく変わります。決算書の収益 ÷ 延べ利用者数で実額に置き換えてください（初期値は未検証のサンプル）。";
 }
 
 /* ---------- 表 ---------- */
@@ -783,11 +750,11 @@ function refreshTable(c){
 
 /* ---------- 数値パネル ---------- */
 function renderNumbers(c){
-  $("o-total").textContent    = man(c.total);
   $("o-wagepool").textContent = man(c.pool);
   $("o-ratio").textContent    = c.rev > 0 ? pct(c.effRatio) : "収益 未入力";
+  $("bench").textContent      = c.svc.bench + " ％";
+  $("o-unitrev").textContent  = (c.users > 0 && c.rev > 0) ? yen(c.unitRev) : "–";
   $("o-n").textContent        = n1(c.n);
-  $("bench").textContent      = "参考：" + c.svc.bench + "％（" + c.svc.benchNote + "）";
   $("nmin-note").innerHTML =
     "職種別の基準をすべて満たすには、いまの職種構成のままだと合計 <b>" +
     (isFinite(c.nMinComp) ? n1(c.nMinComp) + " 人</b>必要です（基準の単純合計は " + n1(c.stdN) + " 人）。" +
@@ -870,7 +837,7 @@ function renderVerdict(c){
     h += "<p>いまの原資で守れるのは、<b>人数なら "+n1(c.nCap)+" 人まで</b>か、<b>賃金なら平均 "+
          n1(c.pool / (c.nmin || 1))+" 万円まで</b>のどちらかです。</p><ul>";
     if (c.rev > 0) h += "<li>収益を変えずに両立させる → 人件費率 <b class='num'>"+pct(c.needRatio)+"</b>（現在 "+pct(c.effRatio)+"）</li>";
-    if (c.mode === "ratio" && c.ratioIn > 0) h += "<li>人件費率を変えずに両立させる → 年間収益 <b class='num'>"+man(c.needRev)+"</b>（現在 "+man(c.rev)+"、差 "+man(c.needRev-c.rev)+"）</li>";
+    if (c.effRatio > 0) h += "<li>人件費率を変えずに両立させる → 年間収益 <b class='num'>"+man(c.needRev)+"</b>（現在 "+man(c.rev)+"、差 "+man(c.needRev-c.rev)+"）</li>";
     h += "<li>どちらも動かせない → 配置か賃金のどちらを下げるかの判断になります</li></ul>";
   } else {
     box.className = "verdict";
@@ -914,7 +881,7 @@ function renderNeedRatio(c){
   } else {
     box.className = "verdict no";
     h += "<p><b>いまの人件費率では "+c.gapPt.toFixed(1)+" ポイント不足</b>します。埋めるには次のどちらかです。</p><ul>";
-    if (c.mode === "ratio" && c.ratioIn > 0) h += "<li>収入を <b class='num'>"+man(c.gapRev)+"</b> 増やす</li>";
+    if (c.effRatio > 0) h += "<li>収入を <b class='num'>"+man(c.gapRev)+"</b> 増やす</li>";
     if (isFinite(c.nCap)) h += "<li>常勤換算を <b class='num'>"+n1(c.gapCutN)+" 人</b> 減らす</li>";
     h += "</ul><p>ここから先は人件費の内側では解けません。収入を増やすか、人件費以外の費用を見直すかのどちらかになります。</p>";
   }
@@ -965,7 +932,7 @@ function renderTrend(c){
   if (p.g > 0){
     var a = p.absorb;
     h += "<p style='margin-top:12px'><b>5年後の増分 "+man(a.delta)+" を吸収するには</b></p>";
-    if (c.mode === "ratio" && c.ratioIn > 0)
+    if (c.effRatio > 0)
       h += "<div class='row'><span class='k'>収入を増やす</span><span class='v'>＋"+man(a.revUp)+"（年率 "+a.rate.toFixed(1)+"％）</span></div>";
     h += "<div class='row'><span class='k'>常勤換算を減らす</span><span class='v'>−"+n1(a.cutN)+" 人</span></div>";
     h += "<div class='row'><span class='k'>昇給カーブを抑える</span><span class='v'>年上昇率 "+p.g.toFixed(1)+"％ を下げる</span></div>";
@@ -981,7 +948,7 @@ function renderMarginal(c){
   h += "<div class='row'><span class='k'>全員の年収を10万円上げる：必要な追加原資</span><span class='v'>"+man(m.needMoreTotal)+"</span></div>";
   h += "<div class='row'><span class='k'>　同じことを人員削減でまかなうなら</span><span class='v'>常勤換算 −"+n1(m.cutN)+" 人</span></div>";
   if (c.rev > 0) h += "<div class='row'><span class='k'>　人件費率で吸収するなら</span><span class='v'>＋"+m.ptUp.toFixed(1)+" ポイント</span></div>";
-  if (c.mode === "ratio" && c.ratioIn > 0) h += "<div class='row'><span class='k'>　収益増でまかなうなら</span><span class='v'>＋"+man(m.revUp)+"</span></div>";
+  if (c.effRatio > 0) h += "<div class='row'><span class='k'>　収益増でまかなうなら</span><span class='v'>＋"+man(m.revUp)+"</span></div>";
   if (c.nSe > 0){
     h += "<div class='row' style='border-top:1px solid var(--rule);margin-top:8px;padding-top:10px'><span class='k'>非正規比率を10ポイント上げる（"+
          m.hiNow.toFixed(0)+"→"+m.hiNew.toFixed(0)+"％）</span><span class='v'></span></div>";
@@ -1087,7 +1054,7 @@ function makeText(c){
   L.push("サービス種別：" + c.svcName);
   c.svc.fields.forEach(function(f){ L.push("　" + f.label + "：" + sizes[f.k] + f.unit); });
   L.push("");
-  L.push("年間収益：" + man(c.rev) + (c.autoRev && c.mode === "ratio" ? "（規模×単価 " + c.price.toLocaleString("ja-JP") + "円 から概算）" : "") + "／人件費率：" + pct(c.effRatio));
+  L.push("年間収益：" + man(c.rev) + "／人件費率：" + pct(c.effRatio) + "（参考 全サービス平均 " + c.svc.bench + "％）");
   L.push("人件費総額：" + man(c.total) + "（法定福利費 " + c.fuku + "％込み）");
   L.push("給与原資：" + man(c.pool));
   L.push("");
@@ -1123,7 +1090,6 @@ function refTotal(c){ return (c && c.stdN > 0) ? c.stdN : (c ? c.baseN : 0); }
 function update(){
   var c = ENGINE.calcState(readInputs());
   last = c;
-  if (autoRev && mode === "ratio") $("rev").value = Math.round(c.rev);
   if (!nminTouched) $("nmin").value = Math.round(c.nmin * 10) / 10;
   /* つまみ位置＝現在の合計 ÷ 基準。確定後も現在の人数を反映し、中央へ戻らない。
      range[0.4,1.8] に収める（実配置がそれを超えても表示上はクランプ）。 */
@@ -1144,26 +1110,14 @@ function foldTo(target){
   update();
 }
 
-function applyAutoRev(){
-  var on = autoRev && mode === "ratio";
-  $("price-field").hidden = !on;
-  $("rev").readOnly = on;
-  $("auto-rev").checked = autoRev;
-}
-
 function loadService(){
   var svc = S[svcKey];
   sizes = {}; nminTouched = false; scale = 1;
   buildScaleFields();
   rows = ENGINE.initialRows(svcKey, sizes, num("week"));
   $("scale").value = 1;
-  $("ratio").value = svc.bench;
-  $("rev").value = svc.defRev;
+  $("rev").value = svc.defRev;                             // 決算書からの実額入力（初期値はサンプル）
   $("total").value = Math.round(svc.defRev * svc.bench / 100);
-  $("price").value = svc.unitPrice;
-  $("price-label").textContent = svc.priceLabel;
-  $("price-hint").textContent = priceHintText();
-  applyAutoRev();
   buildTable();
   update();
 }
@@ -1181,7 +1135,6 @@ document.addEventListener("input", function(e){
   var t = e.target;
   if (t.dataset && t.dataset.sz !== undefined){
     sizes[t.dataset.sz] = parseFloat(t.value) || 0;
-    $("price-hint").textContent = priceHintText();
     update(); return;
   }
   if (t.dataset && t.dataset.i !== undefined){
@@ -1189,7 +1142,6 @@ document.addEventListener("input", function(e){
     update(); return;
   }
   if (t.id === "scale"){ foldTo(parseFloat(t.value) * refTotal(last)); return; }
-  if (t.id === "auto-rev"){ autoRev = t.checked; applyAutoRev(); update(); return; }
   if (t.id === "nmin"){ nminTouched = true; update(); return; }
   if (t.id === "atgt"){ atgtTouched = true; update(); return; }
   update();
@@ -1221,14 +1173,6 @@ document.addEventListener("click", function(e){
   }
   if (t.id === "use-std"){ nminTouched = false; update(); return; }
   if (t.id === "mk"){ var o = $("out"); o.hidden = false; o.value = makeText(update()); o.select(); return; }
-  if (t.id === "mode-ratio" || t.id === "mode-direct"){
-    mode = (t.id === "mode-ratio") ? "ratio" : "direct";
-    $("mode-ratio").setAttribute("aria-pressed", mode === "ratio");
-    $("mode-direct").setAttribute("aria-pressed", mode === "direct");
-    $("ratio-fields").hidden = (mode !== "ratio");
-    $("direct-fields").hidden = (mode !== "direct");
-    applyAutoRev(); update();
-  }
 });
 
 (function(){

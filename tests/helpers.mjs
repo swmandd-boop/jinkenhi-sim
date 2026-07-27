@@ -15,8 +15,8 @@ export function makeInput(service = "tokuyou", over = {}) {
   const clean = Object.fromEntries(Object.entries(over).filter(([, v]) => v !== undefined));
   const base = {
     service, sizes, week,
-    mode: "ratio", autoRev: true,
-    price: svc.unitPrice, rev: svc.defRev, ratio: svc.bench, total: 0,
+    // 収益・人件費総額はともに決算書からの実額入力（既定はサンプル）。人件費率は total/rev で出力。
+    rev: svc.defRev, total: Math.round(svc.defRev * svc.bench / 100),
     fuku: 16.5, bonus: 4, hiW: 70,
     scale: 1, nminAuto: true, nminManual: 0, atgt: 400,
     rows: initialRows(service, sizes, week)

@@ -32,11 +32,7 @@ function randomInput() {
   }));
   return {
     service, sizes, week,
-    mode: pick(["ratio", "direct"]),
-    autoRev: rnd() < 0.7,
-    price: Math.round(between(0, 30000)),
-    rev: Math.round(between(0, 90000)),
-    ratio: Math.round(between(0, 100) * 10) / 10,
+    rev: Math.round(between(0, 90000)),      // 収益・人件費総額ともに実額入力（率は出力）
     total: Math.round(between(0, 60000)),
     fuku: Math.round(between(0, 30) * 10) / 10,
     bonus: Math.round(between(0, 8) * 10) / 10,
