@@ -40,6 +40,7 @@ input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid 
 .chk{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink);margin:0 0 10px;cursor:pointer}
 .chk input{width:auto;margin:0}
 input[readonly]{background:#EEF2F5;color:var(--ink-2)}
+.samp{font-size:11px;color:#B26B00;white-space:nowrap;font-family:var(--gothic)}
 .seg{display:flex;border:1px solid var(--rule);border-radius:2px;overflow:hidden;margin-bottom:14px}
 .seg button{flex:1;border:0;background:#fff;color:var(--ink-2);font-family:var(--gothic);font-size:12.5px;padding:8px 4px;cursor:pointer}
 .seg button[aria-pressed=true]{background:var(--ai);color:#fff}
@@ -135,7 +136,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
         <label class="chk"><input type="checkbox" id="auto-rev" checked> STEP1の規模から収益を概算する</label>
         <div class="field" id="price-field">
           <label for="price" id="price-label">1人1日あたり収入</label>
-          <div class="inline"><input type="number" id="price" value="13200" step="100" min="0"><span class="unit">円</span></div>
+          <div class="inline"><input type="number" id="price" value="13200" step="100" min="0"><span class="unit">円</span><span class="samp">初期値はサンプル・未検証</span></div>
           <p class="hint" id="price-hint"></p>
         </div>
         <div class="field">
@@ -144,7 +145,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
         </div>
         <div class="field">
           <label for="ratio">人件費率（給与費 ÷ 収入）</label>
-          <div class="inline"><input type="number" id="ratio" value="64.3" step="0.1" min="0" max="100"><span class="unit">％</span></div>
+          <div class="inline"><input type="number" id="ratio" value="64.3" step="0.1" min="0" max="100"><span class="unit">％</span><span class="samp">初期値はサンプル・要実額</span></div>
           <p class="hint" id="bench"></p>
         </div>
       </div>
@@ -241,7 +242,8 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
 
     <section class="panel">
       <h2>職種別の内訳<span class="tag">STEP 5</span></h2>
-      <p class="hint" style="margin:-6px 0 10px"><b>正規・非正規は、それぞれの常勤換算をそのまま入れてください</b>（内数ではありません）。合計が「基準」以上かどうかで充足を判定します。初期値は正規に基準どおりの人数、非正規は0人です。基準のない職種（事務・調理など）は0人から始まります。加算要件・自治体条例・兼務の扱いで必要数は変わります。<br>
+      <p class="hint" style="margin:-6px 0 10px"><b>正規・非正規は、それぞれの常勤換算をそのまま入れてください</b>（内数ではありません）。合計が「基準」以上かどうかで充足を判定します。初期値は正規に基準どおりの人数、非正規は0人です。基準のない職種（事務・調理など）は0人から始まります。加算要件・自治体条例で必要数は変わります。<br>
+      <b>兼務している職員は、常勤換算で按分して入力してください</b>（例：看護師0.8・機能訓練指導員0.2）。このツールは兼務の判定を行わず、入力された常勤換算をそのまま基準と突き合わせます。<br>
       <b>平均年収の出し方：</b>給与原資を人数で割った額面です。職種ごとの賃金差は入れていません（総額は職種間の配分に依らないため）。<b>雇用区分：</b>正規の平均年収に対し、非正規は STEP4 の賃金水準（既定70％）を掛けた額です。同じ原資でも比率を変えれば、置ける人数か正規の賃金のどちらかが動きます。<br>
       <b>金額の基準：</b>年収・月例給は<b>額面</b>で、事業主負担の法定福利費は含みません。賃金センサスや求人票の提示年収と同じ土俵の数字です。</p>
       <div class="tbl-scroll">
@@ -305,7 +307,8 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
       </ul>
       <h4>配置基準の自動計算</h4>
       <ul>
-        <li>主要職種の一般的な基準を要約したものです。<b>加算要件、自治体の上乗せ条例、兼務・みなし配置、経過措置は反映していません。</b>実際の必要員数は指定権者への確認が必要です。</li>
+        <li>主要職種の一般的な基準を要約したものです。<b>加算要件、自治体の上乗せ条例、みなし配置、経過措置は反映していません。</b>実際の必要員数は指定権者への確認が必要です。</li>
+        <li><b>兼務はツール側で判定しません。</b>兼務している職員は常勤換算で按分して各職種の行に入力してください（例：看護師0.8・機能訓練指導員0.2）。按分せず各行を独立の1人として置くと、必要人数を過大に見積もります。</li>
         <li>基準は「常勤換算の平均値」で満たせばよい規定です。24時間つねにその比率で人がいることを意味しません。夜勤体制、有給取得、産休・育休、欠員リスクを織り込むと、実務上の必要数は基準を上回ります。<b>そのギャップこそがこのツールで見たい部分です。</b></li>
       </ul>
       <h4>実配置の初期値と雇用区分</h4>
@@ -373,13 +376,13 @@ var SERVICES = {
     users:function(s){ return s.cap * s.occ / 100; },
     build:function(s){
       var u = this.users(s);
-      var kango = u < 30 ? 1 : u < 50 ? 2 : u <= 130 ? 3 : 3 + CEIL((u - 130) / 50);
+      var kango = u <= 30 ? 1 : u <= 50 ? 2 : u <= 130 ? 3 : 3 + CEIL((u - 130) / 50);
       var core = u / 3, r = u / 80;
       return [
         {key:"chief", name:"施設長",             std:1,               a:W.chief,  note:"常勤専従1"},
         {key:"ishi",  name:"医師（嘱託）",        std:0.1,           a:W.ishi,   note:"必要数・非常勤可"},
         {key:"soudan",name:"生活相談員",          std:Math.max(1,CEIL(u/100)), a:W.soudan, note:"入所者100人に1以上"},
-        {key:"kango", name:"看護職員",            std:kango,          a:W.kango,  note:"30未満1／30以上50未満2／50以上130以下3／130超は50ごとに+1"},
+        {key:"kango", name:"看護職員",            std:kango,          a:W.kango,  note:"30以下1／30超50以下2／50超130以下3／130超は50ごとに+1"},
         {key:"kaigo", name:"介護職員",            std:Math.max(0,core-kango), a:W.kaigo, note:"介護＋看護で入所者3人に1（3:1）"},
         {key:"kinou", name:"機能訓練指導員",      std:1,               a:W.kinou,  note:"1以上・兼務可"},
         {key:"cm",    name:"介護支援専門員",      std:Math.max(1,CEIL(u/100)), a:W.cm,  note:"1以上（100:1を標準）・兼務可"},
@@ -402,7 +405,7 @@ var SERVICES = {
     users:function(s){ return s.cap * s.occ / 100; },
     build:function(s){
       var u = this.users(s);
-      var kango = u < 30 ? 1 : u < 50 ? 2 : u <= 130 ? 3 : 3 + CEIL((u - 130) / 50);
+      var kango = u <= 30 ? 1 : u <= 50 ? 2 : u <= 130 ? 3 : 3 + CEIL((u - 130) / 50);
       var core = u / 3, r = u / 80;
       // 日中16時間×常時1人／ユニット ＋ 夜間8時間×1人／2ユニット を週7日回す常勤換算
       var byUnit = (s.units || 1) * (16 + 8/2) * 7 / (s.week || 40);
@@ -792,8 +795,10 @@ function renderEmp(c){
 
 function renderRatio(c){
   var r = c.svc.ratio, cells = "";
+  var avgNote = (isFinite(c.nMinComp) && Math.abs(c.slackN) < 0.5)
+    ? '<span class="samp">基準最小配置での参考値</span>' : '';
   cells += '<div class="cell"><span class="k">平均年収（額面）</span><span class="v">'+n1(c.avg)+
-           '</span><span class="s">万円　月例給 '+yen(c.avg*10000/(12+c.bonus))+'</span></div>';
+           '</span><span class="s">万円　月例給 '+yen(c.avg*10000/(12+c.bonus))+avgNote+'</span></div>';
   cells += '<div class="cell"><span class="k">1人あたり人件費</span><span class="v">'+n1(c.perHead)+
            '</span><span class="s">万円　事業主負担 '+c.fuku+'％ 込み</span></div>';
   cells += '<div class="cell"><span class="k">正規比率</span><span class="v">'+(100-c.hiRate).toFixed(0)+

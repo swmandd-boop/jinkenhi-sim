@@ -31,13 +31,13 @@ var SERVICES = {
     users:function(s){ return s.cap * s.occ / 100; },
     build:function(s){
       var u = this.users(s);
-      var kango = u < 30 ? 1 : u < 50 ? 2 : u <= 130 ? 3 : 3 + CEIL((u - 130) / 50);
+      var kango = u <= 30 ? 1 : u <= 50 ? 2 : u <= 130 ? 3 : 3 + CEIL((u - 130) / 50);
       var core = u / 3, r = u / 80;
       return [
         {key:"chief", name:"施設長",             std:1,               a:W.chief,  note:"常勤専従1"},
         {key:"ishi",  name:"医師（嘱託）",        std:0.1,           a:W.ishi,   note:"必要数・非常勤可"},
         {key:"soudan",name:"生活相談員",          std:Math.max(1,CEIL(u/100)), a:W.soudan, note:"入所者100人に1以上"},
-        {key:"kango", name:"看護職員",            std:kango,          a:W.kango,  note:"30未満1／30以上50未満2／50以上130以下3／130超は50ごとに+1"},
+        {key:"kango", name:"看護職員",            std:kango,          a:W.kango,  note:"30以下1／30超50以下2／50超130以下3／130超は50ごとに+1"},
         {key:"kaigo", name:"介護職員",            std:Math.max(0,core-kango), a:W.kaigo, note:"介護＋看護で入所者3人に1（3:1）"},
         {key:"kinou", name:"機能訓練指導員",      std:1,               a:W.kinou,  note:"1以上・兼務可"},
         {key:"cm",    name:"介護支援専門員",      std:Math.max(1,CEIL(u/100)), a:W.cm,  note:"1以上（100:1を標準）・兼務可"},
@@ -60,7 +60,7 @@ var SERVICES = {
     users:function(s){ return s.cap * s.occ / 100; },
     build:function(s){
       var u = this.users(s);
-      var kango = u < 30 ? 1 : u < 50 ? 2 : u <= 130 ? 3 : 3 + CEIL((u - 130) / 50);
+      var kango = u <= 30 ? 1 : u <= 50 ? 2 : u <= 130 ? 3 : 3 + CEIL((u - 130) / 50);
       var core = u / 3, r = u / 80;
       // 日中16時間×常時1人／ユニット ＋ 夜間8時間×1人／2ユニット を週7日回す常勤換算
       var byUnit = (s.units || 1) * (16 + 8/2) * 7 / (s.week || 40);
