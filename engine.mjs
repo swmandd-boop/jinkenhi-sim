@@ -343,12 +343,22 @@ var SERVICES = {
   /* 配置比率 R のときの職員1人あたり給与費（額面 B）＝ 給与原資 ÷ 職員数(R)。 */
   function bAtRatio(c, R){ var s = staffNAtRatio(c, R); return s > 0 ? c.pool / s : 0; }
 
+  /* staffNAtRatio の逆写像: 職員数 n（正規＋非正規）を与える配置比率 R。
+     n = a/R + b なので R = a/(n − b)。横軸を人数空間にした版（段階2追）で、
+     つまみ／ドラッグの目標人数 n を配置比率へ戻して核だけ按分するのに使う。 */
+  function ratioAtStaffN(c, n){
+    if (!(c.coreN > 0)) return (c.svc.ratio && c.svc.ratio.std) ? c.svc.ratio.std : 1;
+    var a = c.coreStaff * c.users / c.coreN, b = c.staffN - c.coreStaff;
+    return ((n - b) > 0) ? a / (n - b) : Infinity;
+  }
+
   return { W:W, SERVICES:SERVICES, buildStandard:buildStandard,
            calcState:calcState, initialRows:initialRows, scaleRows:scaleRows,
-           scaleCoreToRatio:scaleCoreToRatio, staffNAtRatio:staffNAtRatio, bAtRatio:bAtRatio };
+           scaleCoreToRatio:scaleCoreToRatio, staffNAtRatio:staffNAtRatio, bAtRatio:bAtRatio,
+           ratioAtStaffN:ratioAtStaffN };
 })();
 /* ===== SWMD-ENGINE:END ===== */
 
 export default ENGINE;
 export const { SERVICES, buildStandard, calcState, initialRows, scaleRows,
-  scaleCoreToRatio, staffNAtRatio, bAtRatio } = ENGINE;
+  scaleCoreToRatio, staffNAtRatio, bAtRatio, ratioAtStaffN } = ENGINE;

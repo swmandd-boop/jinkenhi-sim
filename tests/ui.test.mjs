@@ -111,14 +111,20 @@ test("UI-06 スライダー操作後は正規計＋非正規計＋派遣計＝�
   }
 });
 
-test("UI-07 スライダーは配置比率へ合わせ、その他職員は固定、footerと入力合計が一致する", () => {
+test("UI-07 スライダーは人数軸の割合へ合わせ、その他職員は固定、footerと入力合計が一致する", () => {
   const t = open();
   t.row(0, "n", 20); t.row(0, "hi", 11); t.row(2, "n", 3);  // 介護に正規/非正規、その他に正規3
   const other0 = rowTriples(t)[2];                          // その他行（index2）の初期値
-  // 特養は基準3:1。つまみ 0.5 → R = 4 − 3×0.5 = 2.5:1（基準より手厚い）
+  const E = t.d.defaultView.ENGINE;
+  const c0 = stateOf(t);
+  // v0.5段2追: つまみは人数空間の割合[0,1]。特養は基準3:1域＝職員数 staffN(4:1)..staffN(1:1)。
+  // つまみ0.5 → 目標職員数 = その中点。ドラッグ先の staffN がその中点に一致すること。
+  const nmin = E.staffNAtRatio(c0, 4), nmax = E.staffNAtRatio(c0, 1);
   slide(t, 0.5);
   const c = stateOf(t);
-  assert.ok(Math.abs(c.ratioActual - 2.5) < 1e-6, `配置比率が2.5:1にならない: ${c.ratioActual}`);
+  assert.ok(Math.abs(c.staffN - (nmin + 0.5 * (nmax - nmin))) < 1e-6,
+    `職員数が人数軸中点にならない: staffN=${c.staffN} 期待=${nmin + 0.5 * (nmax - nmin)}`);
+  assert.ok(c.ratioActual > 1 && c.ratioActual < 4, `配置比率が域外: ${c.ratioActual}`);
   // その他職員（index2）は配置比率ドラッグで動かない
   const other1 = rowTriples(t)[2];
   assert.ok(Math.abs(other1.n - other0.n) < 1e-9 && Math.abs(other1.hi - other0.hi) < 1e-9 && Math.abs(other1.haken - other0.haken) < 1e-9,
@@ -195,15 +201,15 @@ test("UI-10 配置比率ドラッグはその他職員を固定し、介護:看�
   for (const f of [0.2, 0.8, 0.4, 0.6, 0.1, 0.9]) { slideCommit(t, f); check(`複数回 f=${f}`); }
 });
 
-/* 回帰: つまみを離すと位置が中央に戻る不具合。v0.5段2 ではつまみ＝現在の配置比率の軸上割合。
-   確定後も現在の比率を反映して勝手に戻らないこと、他の入力での再描画でも動かないことを固定する。 */
-test("UI-11 スライダーのつまみは確定後も現在の配置比率を反映し、勝手に戻らない", () => {
+/* 回帰: つまみを離すと位置が中央に戻る不具合。v0.5段2追 ではつまみ＝現在の職員数の人数軸上割合。
+   確定後も現在値を反映して勝手に戻らないこと、他の入力での再描画でも動かないことを固定する。 */
+test("UI-11 スライダーのつまみは確定後も現在の職員数を反映し、勝手に戻らない", () => {
   const t = open();
   const knob = () => parseFloat(t.d.getElementById("scale").value);
   const ratio = () => stateOf(t).ratioActual;
-  slideCommit(t, 0.7);                     // 手厚い側へドラッグして確定（R=1.9:1・frac=0.7）
+  slideCommit(t, 0.7);                     // 手厚い側（右）へドラッグして確定（人数軸割合 0.7）
   const k1 = knob(), r1 = ratio();
-  assert.ok(k1 > 0.5, `確定後につまみが初期(0.333)付近へ戻っている: knob=${k1}`);
+  assert.ok(k1 > 0.5, `確定後につまみが左（薄い側）へ戻っている: knob=${k1}`);
   assert.ok(Math.abs(k1 - 0.7) < 0.01, `つまみが操作値0.7を反映していない: ${k1}`);
   t.set("bonus", 4.5);                      // STEP以外の入力を触って再描画
   assert.ok(Math.abs(knob() - k1) < 0.01, `再描画でつまみが動いた: ${knob()} 期待${k1}`);
@@ -212,8 +218,9 @@ test("UI-11 スライダーのつまみは確定後も現在の配置比率を�
   assert.ok(Math.abs(knob() - k1) < 0.01, `再描画でつまみが戻った: ${knob()}`);
 });
 
-/* INV-26 バーの位置とグラフの点の横位置が一致する（§3）。つまみ（#scale の値＝配置比率の
-   軸上割合）と、グラフの琥珀点の横位置（プロット領域内の割合）が一致することを実DOMで突合。 */
+/* INV-26 バーの位置とグラフの点の横位置が一致する（§3・段2追で人数空間に）。つまみ
+   （#scale の値＝人数軸上の割合）と、グラフの琥珀点の横位置（プロット領域内の割合）が
+   一致することを実DOMで突合。両者は同じ nFrac から算出される。 */
 test("INV-26 バーの位置とグラフの点の横位置が一致する", () => {
   const t = open();
   const VBl = 64, PW = 640 - 64 - 22;   // renderChart の VB.l と プロット幅
@@ -227,6 +234,24 @@ test("INV-26 バーの位置とグラフの点の横位置が一致する", () =
     assert.ok(Math.abs(knob - chartFrac) < 0.005,
       `frac=${frac}: つまみ位置 ${knob} とグラフ点の横位置 ${chartFrac} が不一致`);
   }
+});
+
+/* AXIS-01 横軸が人数（常勤換算）に比例していること（配置比率には比例しない）を固定する。
+   上段の配置比率目盛りは、対応する職員数の位置に置くので間隔は不均等になる。
+   4:1・3:1・2:1 の画面距離の比が、対応する職員数差の比に一致し、かつ等間隔（比率軸のまま
+   なら比=1）ではないことを実DOMで確認する。段2の「比率軸だと双曲線が直線化する」への対処。 */
+test("AXIS-01 横軸は人数に比例する（配置比率には比例しない）", () => {
+  const t = open();
+  const E = t.d.defaultView.ENGINE;
+  const c = stateOf(t);
+  const xr = (R) => { const el = t.d.querySelector(`#chart [data-r="${R}"]`); return el ? parseFloat(el.getAttribute("x")) : null; };
+  const x4 = xr(4), x3 = xr(3), x2 = xr(2);
+  assert.ok(x4 != null && x3 != null && x2 != null, `目盛り 4/3/2:1 が描かれていない: ${x4},${x3},${x2}`);
+  const n = R => E.staffNAtRatio(c, R);
+  const screenRatio = (x2 - x3) / (x3 - x4);
+  const headRatio = (n(2) - n(3)) / (n(3) - n(4));
+  assert.ok(Math.abs(screenRatio - headRatio) < 0.02, `画面距離比 ${screenRatio} ≠ 人数差比 ${headRatio}（人数比例でない）`);
+  assert.ok(Math.abs(screenRatio - 1) > 0.2, `目盛りが等間隔（比率軸のまま）: 比=${screenRatio}`);
 });
 
 /* 職種別内訳テーブルのレイアウトの構成担保（jsdom は実レイアウトを持たないため、

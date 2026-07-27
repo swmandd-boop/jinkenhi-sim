@@ -58,11 +58,19 @@ async function measure(width) {
     const tPad = parseFloat(getComputedStyle(tPanel).paddingRight);
     const panelContentRight = tPanel.getBoundingClientRect().right - tPad;
     const trendYearRightMargin = yrCellRight.length ? panelContentRight - Math.max(...yrCellRight) : 999;
+    // 横軸の2段目盛り（上段=配置比率 data-rt / 下段=常勤換算数 data-nt）が行内で重ならないこと
+    const rowOverlap = (sel) => {
+      const rects = [...document.querySelectorAll(sel)].map(e => e.getBoundingClientRect()).sort((a, b) => a.left - b.left);
+      let ov = 0;
+      for (let i = 1; i < rects.length; i++) ov = Math.max(ov, rects[i - 1].right - rects[i].left);
+      return { n: rects.length, ov };
+    };
     return {
       innerWidth: window.innerWidth,
       pageScrollW: document.documentElement.scrollWidth,
       container: sc.clientWidth, table: tbl.offsetWidth, tblScrollW: sc.scrollWidth,
-      names, inputs, trendYearRightMargin
+      names, inputs, trendYearRightMargin,
+      ratioTicks: rowOverlap('#chart [data-rt]'), headTicks: rowOverlap('#chart [data-nt]')
     };
   });
 }
@@ -76,6 +84,9 @@ for (const w of [1280, 1440, 1680]) {
     assert.ok(m.tblScrollW <= m.container + 1, `${w}px: 標準幅で横スクロールが出ている`);
     assert.ok(m.pageScrollW <= m.innerWidth + 1, `${w}px: ページ本体が横にはみ出している`);
     assert.ok(m.trendYearRightMargin >= 20, `${w}px: 推移表「10年後」列が右端に張り付いている（右余白 ${m.trendYearRightMargin.toFixed(0)}px）`);
+    assert.ok(m.ratioTicks.n >= 3, `${w}px: 配置比率の目盛りが少なすぎる（${m.ratioTicks.n}）`);
+    assert.ok(m.ratioTicks.ov <= 1, `${w}px: 横軸 上段（配置比率）の目盛りラベルが重なっている（重なり ${m.ratioTicks.ov.toFixed(1)}px）`);
+    assert.ok(m.headTicks.ov <= 1, `${w}px: 横軸 下段（常勤換算数）の目盛りラベルが重なっている（重なり ${m.headTicks.ov.toFixed(1)}px）`);
   });
 }
 

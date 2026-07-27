@@ -196,7 +196,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
   <div>
     <section class="chartbox">
       <h2>配置比率と賃金のトレードオフ</h2>
-      <p class="chartnote">横軸は介護・看護職員の配置比率（対 入所者）。琥珀色の点を左右にドラッグすると介護・看護の人数だけが動き（その他職員は固定）、手厚くするほど職員1人あたり給与費が下がります。左（薄い側）が基準割れです。</p>
+      <p class="chartnote">横軸は職員数（常勤換算）で、対応する配置比率（介護・看護 対 入所者）を上段に併記します。曲線は給与原資÷職員数の双曲線。琥珀色の点を左右にドラッグすると介護・看護の人数だけが動き（その他職員は固定）、手厚くするほど職員1人あたり給与費が下がります。左（薄い側）が基準割れです。</p>
       <svg id="chart" viewBox="0 0 640 400" role="img" aria-label="配置比率と職員1人あたり給与費のトレードオフ曲線"></svg>
       <div class="legend">
         <span><i style="border-color:var(--take)"></i>基準内かつ賃金下限を満たす区間</span>
@@ -675,9 +675,19 @@ var SERVICES = {
   /* 配置比率 R のときの職員1人あたり給与費（額面 B）＝ 給与原資 ÷ 職員数(R)。 */
   function bAtRatio(c, R){ var s = staffNAtRatio(c, R); return s > 0 ? c.pool / s : 0; }
 
+  /* staffNAtRatio の逆写像: 職員数 n（正規＋非正規）を与える配置比率 R。
+     n = a/R + b なので R = a/(n − b)。横軸を人数空間にした版（段階2追）で、
+     つまみ／ドラッグの目標人数 n を配置比率へ戻して核だけ按分するのに使う。 */
+  function ratioAtStaffN(c, n){
+    if (!(c.coreN > 0)) return (c.svc.ratio && c.svc.ratio.std) ? c.svc.ratio.std : 1;
+    var a = c.coreStaff * c.users / c.coreN, b = c.staffN - c.coreStaff;
+    return ((n - b) > 0) ? a / (n - b) : Infinity;
+  }
+
   return { W:W, SERVICES:SERVICES, buildStandard:buildStandard,
            calcState:calcState, initialRows:initialRows, scaleRows:scaleRows,
-           scaleCoreToRatio:scaleCoreToRatio, staffNAtRatio:staffNAtRatio, bAtRatio:bAtRatio };
+           scaleCoreToRatio:scaleCoreToRatio, staffNAtRatio:staffNAtRatio, bAtRatio:bAtRatio,
+           ratioAtStaffN:ratioAtStaffN };
 })();
 /* ===== SWMD-ENGINE:END ===== */
 
@@ -980,7 +990,7 @@ function renderMarginal(c){
 
 /* ---------- 曲線 ---------- */
 var SVGNS = "http://www.w3.org/2000/svg";
-var VB = {w:640, h:400, l:64, r:22, t:20, b:46};
+var VB = {w:640, h:400, l:64, r:22, t:20, b:54};   // b: 横軸に2段目盛り（配置比率／常勤換算数）を置くため広め
 var view = null;
 function el(tag, attrs, text){
   var e = document.createElementNS(SVGNS, tag);
@@ -1003,53 +1013,77 @@ function ratioAxis(c){
   var Rc = (c.ratioActual > 0) ? c.ratioActual : 3;
   return { rmax: Math.max(Rc * 1.4, Rc + 1), rmin: Math.max(0.5, Rc * 0.6), base: null };
 }
-function ratioFrac(ax, R){
-  if (!ax || ax.rmax <= ax.rmin) return 0;
-  return Math.min(1, Math.max(0, (ax.rmax - R) / (ax.rmax - ax.rmin)));
+/* 人数空間の軸（段階2追）: 配置比率 rmax..rmin に対応する職員数 n を左右端にとる。
+   薄い側(rmax)=小さいn=左、手厚い側(rmin)=大きいn=右。基準線は基準比率に対応する n。
+   横軸を人数にすると等原資曲線 給与原資÷n が双曲線として見える（比率軸だと反比例が
+   打ち消されてほぼ直線になるため・段階2の実測で判明）。 */
+function nAxis(c){
+  var ax = ratioAxis(c);
+  if (!ax || !(c.coreN > 0)) return null;
+  var nmin = ENGINE.staffNAtRatio(c, ax.rmax);   // 左端（薄い＝職員少）
+  var nmax = ENGINE.staffNAtRatio(c, ax.rmin);   // 右端（手厚い＝職員多）
+  return { ax:ax, nmin:nmin, nmax:nmax, nbase: ax.base ? ENGINE.staffNAtRatio(c, ax.base) : null };
 }
-function fracToRatio(ax, f){ return ax ? ax.rmax - f * (ax.rmax - ax.rmin) : 0; }
+function nFrac(nx, n){
+  if (!nx || nx.nmax <= nx.nmin) return 0;
+  return Math.min(1, Math.max(0, (n - nx.nmin) / (nx.nmax - nx.nmin)));
+}
+function fracToN(nx, f){ return nx ? nx.nmin + f * (nx.nmax - nx.nmin) : 0; }
+/* 上段の配置比率目盛り。基準3:1域は指定の8点、基準なし（通所）は域内を等分。 */
+function ratioTicks(ax){
+  if (ax.base){
+    return [4.0,3.5,3.0,2.5,2.0,1.5,1.2,1.0].filter(function(R){ return R >= ax.rmin - 1e-9 && R <= ax.rmax + 1e-9; });
+  }
+  var out = [], k = 7;
+  for (var i = 0; i < k; i++) out.push(ax.rmax - (ax.rmax - ax.rmin) * i / (k - 1));
+  return out;
+}
 
 function renderChart(c){
   var svg = $("chart");
   while (svg.firstChild) svg.removeChild(svg.firstChild);
-  var ax = ratioAxis(c);
-  var PW = VB.w-VB.l-VB.r, PH = VB.h-VB.t-VB.b;
-  if (!ax || !(c.coreN > 0) || !(c.pool > 0)){ view = null; return; }
-  view = { ax:ax, PW:PW };
-  /* 縦軸: 職員1人あたり給与費 B。薄い側（rmax）で最大、手厚い側（rmin）で最小。 */
-  var Bthin = ENGINE.bAtRatio(c, ax.rmax);
-  var ymax = Math.max(isFinite(Bthin) ? Bthin*1.12 : 0, c.atgt*1.35, c.B*1.15, 1);
-  var X = function(R){ return VB.l + ratioFrac(ax, R)*PW; };
+  var nx = nAxis(c), PW = VB.w-VB.l-VB.r, PH = VB.h-VB.t-VB.b;
+  if (!nx || !(c.pool > 0) || !(nx.nmax > nx.nmin)){ view = null; return; }
+  view = { nx:nx, PW:PW };
+  /* 横軸＝職員数 n（正規＋非正規）。曲線は 給与原資÷n の双曲線。左端(nmin)で B 最大。 */
+  var X = function(n){ return VB.l + nFrac(nx, n)*PW; };
+  var ymax = Math.max(c.pool/nx.nmin*1.10, c.atgt*1.35, c.B*1.15, 1);
   var Y = function(v){ return VB.t + PH - (v/ymax)*PH; };
   var i, step = niceStep(ymax/5);
   for (i = step; i <= ymax; i += step){
     svg.appendChild(el("line",{x1:VB.l,x2:VB.l+PW,y1:Y(i),y2:Y(i),stroke:"#DCE3E8","stroke-width":1}));
     svg.appendChild(el("text",{x:VB.l-9,y:Y(i)+4,"text-anchor":"end","font-size":10,fill:"#4A5C68","font-family":"ui-monospace,Menlo,monospace"}, String(Math.round(i))));
   }
-  /* 横軸目盛り: 配置比率を整数刻みで（4:1, 3:1, 2:1, 1:1 …） */
-  var rlo = Math.ceil(ax.rmin), rhi = Math.floor(ax.rmax);
-  for (i = rlo; i <= rhi; i++){
-    svg.appendChild(el("text",{x:X(i),y:VB.t+PH+18,"text-anchor":"middle","font-size":10,fill:"#4A5C68","font-family":"ui-monospace,Menlo,monospace"}, i+":1"));
-  }
-  /* 基準割れ領域（基準線より左＝薄い側）を淡く塗る */
-  if (ax.base && ax.base < ax.rmax){
-    var xb = X(ax.base);
-    svg.appendChild(el("rect",{x:VB.l,y:VB.t,width:Math.max(0,xb-VB.l),height:PH,fill:"#B23A2E","fill-opacity":.05}));
+  /* 基準割れ領域（基準線より左＝薄い側＝小さいn）を淡く塗る */
+  if (nx.nbase != null && nx.nbase > nx.nmin){
+    svg.appendChild(el("rect",{x:VB.l,y:VB.t,width:Math.max(0,X(nx.nbase)-VB.l),height:PH,fill:"#B23A2E","fill-opacity":.05}));
   }
   svg.appendChild(el("line",{x1:VB.l,x2:VB.l+PW,y1:VB.t+PH,y2:VB.t+PH,stroke:"#101F2B","stroke-width":1.5}));
   svg.appendChild(el("line",{x1:VB.l,x2:VB.l,y1:VB.t,y2:VB.t+PH,stroke:"#101F2B","stroke-width":1.5}));
   svg.appendChild(el("text",{x:VB.l,y:VB.t-6,"font-size":10.5,fill:"#4A5C68"},"職員1人あたり給与費（額面・万円）"));
-  svg.appendChild(el("text",{x:VB.l+PW,y:VB.t+PH+36,"text-anchor":"end","font-size":10.5,fill:"#4A5C68"},(c.svc.ratio.label||"配置比率")+"　薄い ← → 手厚い"));
 
-  /* 等原資曲線を配置比率で描く。B(R)=給与原資÷職員数(R)。核を薄く（Rを大きく）すると
-     職員が減り B は上がる。全域を破線、基準内かつ賃金下限以上の区間を太実線にする。 */
+  /* 横軸: 2段目盛り。上段＝配置比率、下段＝対応する常勤換算数（職員数）。
+     位置は人数空間なので間隔は不均等（手厚い側ほど広がる＝1段手厚くするコスト増が見える）。
+     ラベルは左から貪欲に最小間隔をあけて描き、詰まった薄い端での重なりを避ける。 */
+  var ticks = ratioTicks(nx.ax), lastLbl = -1e9, MINGAP = 38;
+  ticks.forEach(function(R){
+    var n = ENGINE.staffNAtRatio(c, R), x = X(n);
+    svg.appendChild(el("line",{x1:x,x2:x,y1:VB.t+PH,y2:VB.t+PH+4,stroke:"#101F2B","stroke-width":1}));   // 目盛り線は全点
+    if (x - lastLbl < MINGAP) return;                                                                     // ラベルは重ならない分だけ
+    lastLbl = x;
+    svg.appendChild(el("text",{x:x,y:VB.t+PH+16,"text-anchor":"middle","font-size":10,fill:"#4A5C68","font-family":"ui-monospace,Menlo,monospace","data-rt":"1","data-r":String(R)}, n1(R)+":1"));
+    svg.appendChild(el("text",{x:x,y:VB.t+PH+29,"text-anchor":"middle","font-size":9.5,fill:"#8595A0","font-family":"ui-monospace,Menlo,monospace","data-nt":"1"}, n1(n)));
+  });
+  svg.appendChild(el("text",{x:VB.l+PW,y:VB.t+PH+45,"text-anchor":"end","font-size":10,fill:"#4A5C68"},"上：配置比率／下：常勤換算数（人）　薄い ← → 手厚い"));
+
+  /* 等原資曲線 y=給与原資÷n（双曲線）。全域を破線、基準内かつ賃金下限以上の区間を太実線。 */
   function seg(cond){
     var d = "", first = true;
     for (var s = 0; s <= 120; s++){
-      var f = s/120, R = fracToRatio(ax, f), y = ENGINE.bAtRatio(c, R);
+      var n = nx.nmin + (nx.nmax - nx.nmin)*s/120, y = c.pool/n, R = ENGINE.ratioAtStaffN(c, n);
       var on = (y > 0 && y <= ymax*1.02) && (!cond || cond(R, y));
       if (!on){ first = true; continue; }
-      d += (first?"M":"L") + X(R).toFixed(1) + " " + Y(y).toFixed(1) + " ";
+      d += (first?"M":"L") + X(n).toFixed(1) + " " + Y(y).toFixed(1) + " ";
       first = false;
     }
     return d;
@@ -1057,15 +1091,16 @@ function renderChart(c){
   svg.appendChild(el("path",{d:seg(null),fill:"none",stroke:"#9FB0BC","stroke-width":1.5,"stroke-dasharray":"3 3"}));
   /* 基準内（R<=基準）かつ 賃金下限以上（B>=atgt）。基準の無いサービスは賃金だけで判定 */
   var okBand = seg(function(R, y){
-    return (!ax.base || R <= ax.base + 1e-9) && (!(c.atgt > 0) || y >= c.atgt - 1e-9);
+    return (!nx.ax.base || R <= nx.ax.base + 1e-9) && (!(c.atgt > 0) || y >= c.atgt - 1e-9);
   });
   if (okBand) svg.appendChild(el("path",{d:okBand,fill:"none",stroke:"#2A7F72","stroke-width":4,"stroke-linecap":"round"}));
   else if (c.atgt > 0) svg.appendChild(el("text",{x:VB.l+PW/2,y:VB.t+PH/2,"text-anchor":"middle","font-size":13,fill:"#B23A2E","font-weight":"600"},"両立する区間なし"));
 
-  /* 基準線（例: 3:1） */
-  if (ax.base && ax.base > ax.rmin && ax.base < ax.rmax){
-    svg.appendChild(el("line",{x1:X(ax.base),x2:X(ax.base),y1:VB.t,y2:VB.t+PH,stroke:"#B23A2E","stroke-width":1.4,"stroke-dasharray":"6 4"}));
-    svg.appendChild(el("text",{x:X(ax.base)+5,y:VB.t+12,"font-size":10.5,fill:"#B23A2E"},"基準 "+ax.base+" : 1"));
+  /* 基準線（例: 3:1）＝対応する職員数の位置 */
+  if (nx.nbase != null && nx.nbase > nx.nmin && nx.nbase < nx.nmax){
+    var xB = X(nx.nbase);
+    svg.appendChild(el("line",{x1:xB,x2:xB,y1:VB.t,y2:VB.t+PH,stroke:"#B23A2E","stroke-width":1.4,"stroke-dasharray":"6 4"}));
+    svg.appendChild(el("text",{x:xB+5,y:VB.t+12,"font-size":10.5,fill:"#B23A2E"},"基準 "+nx.ax.base+" : 1"));
   }
   /* 賃金下限（横線） */
   if (c.atgt > 0 && c.atgt < ymax){
@@ -1073,15 +1108,15 @@ function renderChart(c){
     svg.appendChild(el("text",{x:VB.l+PW-4,y:Y(c.atgt)-6,"text-anchor":"end","font-size":10.5,fill:"#1B4965"},"賃金下限 "+n1(c.atgt)+"万円"));
   }
 
-  /* いまの置き方の点（配置比率 × 職員1人あたり給与費 B） */
-  if (c.ratioActual > 0 && c.B > 0 && c.B <= ymax){
-    var cx = X(c.ratioActual), cy = Y(c.B);
+  /* いまの置き方の点（職員数 × 職員1人あたり給与費 B） */
+  if (c.staffN > 0 && c.B > 0 && c.B <= ymax){
+    var cx = X(c.staffN), cy = Y(c.B);
     svg.appendChild(el("line",{x1:cx,x2:cx,y1:cy,y2:VB.t+PH,stroke:"#B8801F","stroke-width":1,"stroke-dasharray":"2 3"}));
     svg.appendChild(el("circle",{cx:cx,cy:cy,r:11,fill:"#B8801F","fill-opacity":.16}));
     svg.appendChild(el("circle",{cx:cx,cy:cy,r:5.5,fill:"#B8801F",stroke:"#fff","stroke-width":2,"data-o":"point"}));
-    var right = cx > VB.l+PW*0.7;
+    var right = cx > VB.l+PW*0.6;
     svg.appendChild(el("text",{x:cx+(right?-10:10),y:cy-16,"text-anchor":right?"end":"start","font-size":12,"font-weight":"600",fill:"#101F2B"},
-      n2(c.ratioActual)+" : 1 / "+n1(c.B)+"万円"));
+      n2(c.ratioActual)+" : 1 ／ "+n1(c.staffN)+"人 ／ "+n1(c.B)+"万円"));
   }
 }
 
@@ -1125,9 +1160,10 @@ function update(){
   var c = ENGINE.calcState(readInputs());
   last = c;
   if (!nminTouched) $("nmin").value = Math.round(c.nmin * 10) / 10;
-  /* つまみ位置＝現在の配置比率の軸上の割合。確定後も現在の比率を反映し、勝手に戻らない。 */
-  var ax = ratioAxis(c);
-  if (ax && c.ratioActual > 0) $("scale").value = ratioFrac(ax, c.ratioActual);
+  /* つまみ位置＝現在の職員数の人数軸上の割合（段階2追: 人数空間）。グラフ点の横位置と
+     同じ nFrac から算出するので一致する（INV-26）。確定後も現在値を反映し勝手に戻らない。 */
+  var nx = nAxis(c);
+  if (nx && c.staffN > 0) $("scale").value = nFrac(nx, c.staffN);
   $("o-ratiobar").textContent = (c.ratioActual > 0) ? n2(c.ratioActual) : "–";
   renderNumbers(c); renderEmp(c); renderRatio(c);
   renderCompliance(c); renderVerdict(c); renderNeedRatio(c); renderAnchor(c); renderMarginal(c); renderTrend(c); renderChart(c);
@@ -1180,8 +1216,8 @@ document.addEventListener("input", function(e){
     update(); return;
   }
   if (t.id === "scale"){
-    var ax = ratioAxis(last);
-    if (ax) foldCoreTo(fracToRatio(ax, parseFloat(t.value)));
+    var nx = nAxis(last);
+    if (nx) foldCoreTo(ENGINE.ratioAtStaffN(last, fracToN(nx, parseFloat(t.value))));   // 割合f→目標職員数n→配置比率R
     return;
   }
   if (t.id === "nmin"){ nminTouched = true; update(); return; }
@@ -1220,12 +1256,12 @@ document.addEventListener("click", function(e){
 (function(){
   var svg = $("chart"), dragging = false;
   function apply(ev){
-    if (!view || !view.ax) return;
+    if (!view || !view.nx) return;
     var box = svg.getBoundingClientRect();
     var px = (ev.clientX - box.left)/box.width*VB.w;
     var f = Math.min(1, Math.max(0, (px - VB.l)/view.PW));
-    /* 横位置 f（0＝左＝薄い側）を配置比率 R に戻し、介護・看護だけを畳む。 */
-    foldCoreTo(fracToRatio(view.ax, f));
+    /* 横位置 f（0＝左＝薄い側＝職員少）を目標職員数 n→配置比率 R に戻し、介護・看護だけを畳む。 */
+    foldCoreTo(ENGINE.ratioAtStaffN(last, fracToN(view.nx, f)));
   }
   svg.addEventListener("pointerdown", function(e){ dragging = true; svg.setPointerCapture(e.pointerId); apply(e); });
   svg.addEventListener("pointermove", function(e){ if (dragging) apply(e); });
