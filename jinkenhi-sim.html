@@ -873,6 +873,14 @@ function renderNeedRatio(c){
   var box = $("need-ratio");
   if (!(c.rev > 0)){ box.hidden = true; box.innerHTML = ""; return; }
   box.hidden = false;
+  /* 必要人件費率は nmin×atgt で計算するため、下回れない平均年収が未入力（初期値のまま）だと
+     サンプル値（初期値400万）を根拠にした診断になる。§6 と同じく、入力前は数値を出さず促す。 */
+  if (!atgtTouched){
+    box.className = "verdict";
+    box.innerHTML = "<h3>必要人件費率</h3><p class='hint'>「下回れない平均年収」を入れると、譲れない線を守るのに必要な人件費率が出ます（初期値 " +
+      n1(c.atgt) + " 万円はサンプルで、これを根拠に診断すると未検証の値が判定基準になってしまいます）。</p>";
+    return;
+  }
   var h = "<h3>必要人件費率 <b class='num'>"+pct(c.needRatio)+"</b></h3>";
   h += "<p>配置下限 <b class='num'>"+n1(c.nmin)+"</b> 人を平均年収 <b class='num'>"+n1(c.atgt)+
        "</b> 万円で守るには、人件費率が <b class='num'>"+pct(c.needRatio)+

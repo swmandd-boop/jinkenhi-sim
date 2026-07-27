@@ -149,3 +149,22 @@ test("UI-08 定点の位置づけ：起動時は基準ちょうど警告＋賃�
   assert.ok(!anchor().includes("配置が基準ちょうど"), `増員後も基準ちょうど警告が残る: ${anchor()}`);
   assert.ok(anchor().includes("賃金の余裕"), `atgt入力後に賃金余裕を出していない: ${anchor()}`);
 });
+
+/* 新機能A（§5）の表示条件を §6 に揃える：必要人件費率は nmin×atgt で計算するため、
+   下回れない平均年収が未入力（初期値のまま）だとサンプル値を根拠にした診断になる。
+   よって atgt 未入力なら数値を出さず入力を促す。§5と§6で片方だけ出る状態を作らない。 */
+test("UI-09 必要人件費率は下回れない平均年収の入力前は数値を出さない（§5/§6整合）", () => {
+  const t = open();
+  const need = () => t.txt("#need-ratio");
+  const anchor = () => t.txt("#anchor");
+  const needHasNumber = () => need().includes("必要です");     // 数値状態のみに現れる語
+  const anchorHasWage = () => anchor().includes("賃金の余裕："); // 賃金余裕の数値状態
+  // 起動直後（atgt未入力）：§5は数値を出さず入力を促す。§6も賃金判定を伏せる。
+  assert.ok(!needHasNumber(), `atgt未入力で必要人件費率の数値が出ている: ${need()}`);
+  assert.ok(need().includes("下回れない平均年収"), `入力を促していない: ${need()}`);
+  assert.equal(needHasNumber(), anchorHasWage(), `§5と§6の表示条件が不一致（未入力時）: need=${needHasNumber()} anchor=${anchorHasWage()}`);
+  // atgt入力後：§5は数値を出す。§6も賃金余裕を出す。
+  t.set("atgt", 450);
+  assert.ok(needHasNumber(), `atgt入力後に必要人件費率の数値が出ていない: ${need()}`);
+  assert.equal(needHasNumber(), anchorHasWage(), `§5と§6の表示条件が不一致（入力後）: need=${needHasNumber()} anchor=${anchorHasWage()}`);
+});
