@@ -584,3 +584,55 @@ test("PUB-03 問い合わせ導線は相談内容が伝わる文言で、リン�
   assert.equal(a.textContent.trim(), "この結果の読み解き、改善の方向性についてご相談いただけます");
   assert.equal(a.getAttribute("rel"), "noopener", `rel=noopener が外れている`);
 });
+
+/* AXB-04（2026-07-28）: 通所の軸域を特養系と同じ幅に広げた。
+   特養系の軸は 左端 R=基準+1／右端 R=1 で、核（介護・看護）は core(R)=利用者÷R だから
+   「核を 基準/(基準+1)=0.75倍 〜 基準/1=3倍」にした範囲にあたる。通所も同じ核倍率にした。
+   ★stdN に直接倍率を掛けないのは、その他職員まで増減させることになり、核しか動かさない
+     ドラッグと対応しなくなるため。★左端でも核は基準の0.75倍（>0）でゼロ除算が起きない。 */
+test("AXB-04 通所の軸は基準を割る領域まで見え、左端でも核が0にならない", () => {
+  const t = open();
+  t.svc("tsuusho");
+  const c0 = stateOf(t);
+  const coreStd = c0.coreStd, otherStd = c0.stdN - c0.coreStd;
+  assert.ok(coreStd > 0, `前提: 核の基準がある`);
+
+  // 左端：基準の単純合計を下回る（＝基準割れの領域が見えている）
+  slide(t, 0);
+  const lo = stateOf(t);
+  assert.ok(lo.n < c0.stdN, `左端 ${lo.n} が基準の単純合計 ${c0.stdN} を下回っていない（基準割れが見えない）`);
+  assert.ok(Math.abs(lo.n - (coreStd * 0.75 + otherStd)) < 1e-6,
+    `左端が「核0.75倍＋その他」になっていない: ${lo.n} 期待 ${coreStd * 0.75 + otherStd}`);
+  // 左端の核は基準の75%（特養の 4:1 と同じ薄さ）で、0ではない
+  assert.ok(Math.abs(lo.coreN / coreStd - 0.75) < 1e-6, `左端の核が基準の0.75倍でない: ${lo.coreN / coreStd}`);
+  assert.ok(lo.coreN > 0, `左端で核が0になっている（ゼロ除算の再発）`);
+
+  // 右端：核が基準の3倍
+  slide(t, 1);
+  const hi = stateOf(t);
+  assert.ok(Math.abs(hi.coreN / coreStd - 3) < 1e-6, `右端の核が基準の3倍でない: ${hi.coreN / coreStd}`);
+  assert.ok(hi.n > c0.stdN, `右端 ${hi.n} が基準を上回っていない`);
+
+  // 端点を連続で踏んでも壊れない（ゼロ除算・発散・NaN）
+  const seq = [];
+  for (let i = 0; i < 40; i++) seq.push(0);
+  for (let i = 0; i < 40; i++) seq.push(1);
+  seq.push(0);
+  for (const f of seq) {
+    slide(t, f);
+    const c = stateOf(t);
+    assert.ok(c.coreN > 0, `連続操作で核が0に潰れた（f=${f}）`);
+    assert.ok(Number.isFinite(c.n) && Number.isFinite(c.A), `連続操作で職員数/Aが壊れた（f=${f}）`);
+    assert.ok(c.ratioActual == null || Number.isFinite(c.ratioActual), `連続操作で比率が発散した（f=${f}）`);
+  }
+  assert.equal(screenAnomalies(t.d).length, 0, `画面に異常表記: ${screenAnomalies(t.d).join(" | ")}`);
+
+  // 特養系の軸は「核0.75倍〜3倍」と一致している（同じ幅であることの確認）
+  const u = open();
+  u.svc("tokuyou");
+  const cu = stateOf(u);
+  slide(u, 0); const ulo = stateOf(u);
+  slide(u, 1); const uhi = stateOf(u);
+  assert.ok(Math.abs(ulo.coreN / cu.coreStd - 0.75) < 1e-6, `特養の左端の核倍率が0.75でない: ${ulo.coreN / cu.coreStd}`);
+  assert.ok(Math.abs(uhi.coreN / cu.coreStd - 3) < 1e-6, `特養の右端の核倍率が3でない: ${uhi.coreN / cu.coreStd}`);
+});

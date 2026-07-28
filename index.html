@@ -1124,10 +1124,19 @@ function ratioAxis(c){
 }
 /* 人数空間の軸。横軸は常に職員数（fteAll）。
    - 比率基準あり：配置比率 rmax..rmin に対応する職員数を左右端にとる（基準線＝基準比率の位置）。
-   - 比率基準なし（通所）：**基準の単純合計 stdN をアンカー**に人数域を固定し、比率は使わない。
-     ★アンカーに nMinComp（今の構成で基準を満たす最小）を使うと、核だけを動かすドラッグで
-       sMin が変わって軸が動いてしまう。stdN は定員・稼働率だけで決まる法令由来の値で
-       ドラッグ不変なので、こちらを使う（閾値の発明ではない）。 */
+   - 比率基準なし（通所）：**核（介護・看護）の基準を CORE_LO 倍〜CORE_HI 倍にした職員数**を軸域にする。
+
+   ★倍率の根拠（発明ではなく、比率基準のあるサービスと同じ幅に揃えたもの）。
+     比率基準ありの軸は 左端 R=基準+1／右端 R=1 で、核は core(R)=利用者÷R だから
+       左端の核 ＝ 基準/(基準+1) 倍 ＝ 3/(3+1) ＝ 0.75倍
+       右端の核 ＝ 基準/1 倍       ＝ 3倍
+     となる（基準3:1のサービスで共通）。通所も同じ「核0.75〜3倍」にすれば、
+     基準を割る側（0.75倍＝25%薄い）も同じ深さまで見える。
+   ★stdN に直接倍率を掛けないのは、その他職員まで一緒に増減させることになるため。
+     ドラッグは核しか動かさない（その他は固定）ので、軸の端も核の増減で定義するのが対応する。
+   ★核の基準は定員・稼働率だけで決まりドラッグでは変わらないので、軸はドラッグで動かない。
+   ★左端でも核は基準の0.75倍（>0）なので、核0→ゼロ除算は起きない。 */
+var CORE_LO = 0.75, CORE_HI = 3;
 function nAxis(c){
   if (hasRatioStd(c)){
     var ax = ratioAxis(c);
@@ -1135,8 +1144,10 @@ function nAxis(c){
     return { ax:ax, nmin: ENGINE.fteAllAtRatio(c, ax.rmax), nmax: ENGINE.fteAllAtRatio(c, ax.rmin),
              nbase: ENGINE.fteAllAtRatio(c, ax.base) };
   }
-  if (!(c.stdN > 0)) return null;
-  return { ax:null, nmin: c.stdN * 0.85, nmax: c.stdN * 2.0, nbase: null };
+  if (!(c.stdN > 0) || !(c.coreStd > 0)) return null;
+  var otherStd = c.stdN - c.coreStd;                    // その他職員の基準（ドラッグで動かない）
+  return { ax:null, nmin: c.coreStd * CORE_LO + otherStd, nmax: c.coreStd * CORE_HI + otherStd,
+           nbase: null };
 }
 function nFrac(nx, n){
   if (!nx || nx.nmax <= nx.nmin) return 0;
