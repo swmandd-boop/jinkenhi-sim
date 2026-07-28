@@ -247,6 +247,21 @@ var SERVICES = {
         cutN: n > 0 ? n * (1 - 1 / fA) : 0      // 常勤換算を減らす（t年後の単価で吸収）
       }
     };
+    /* 同じジレンマの両面（5年後）。賃金が年率 g で上がるとき、原資を増やして人数を保つか、
+       原資を保って人数（＝配置）を落とすかの二択を数値で並べる。g=0 なら両方とも現在値に一致。
+       ・人数を保つ：人件費率(5)=率(0)×(1+g)^5、人件費増分=総額×((1+g)^5−1)（推移表と同じ）
+       ・率を保つ ：n(5)=n(0)/(1+g)^5（等原資曲線上の点＝n×給与費が原資と一定）、
+                    配置比率(5)=入所者数 ÷（n(5)−その他職員） */
+    var fD = grow(5);
+    var n5 = (fD > 0) ? n / fD : n, core5 = n5 - otherStaff;
+    proj.dilemma = {
+      t: 5,
+      keepStaff: { ratio: effRatio * fD, ratioNow: effRatio, deltaTotal: total * (fD - 1) },
+      keepRatio: {
+        nNow: n, n5: n5, ratioNow: ratioActual,
+        ratio5: (users > 0 && core5 > 0) ? users / core5 : 0
+      }
+    };
 
     /* 限界トレードオフ（v0.5: 非正規の賃金水準係数を廃したため、金額を正規/非正規で分ける
        トレードオフは削除。人数と原資の関係のみ残す） */

@@ -360,6 +360,50 @@ test("INV-20 推移の吸収（人員減・収入増）が同じ増分を指す"
   }
 });
 
+/* ==== v0.5「同じジレンマの両面」（5年後・段階3の代替） ==== */
+
+/* ---- DIL-01 率を保つ側の n(t)=n(0)/(1+g)^t、かつ等原資（n×給与費が原資と一定）----
+   賃金が年率 g で上がるとき、原資を保つと職員数は (1+g)^t で割った点まで減る。
+   n(t)×給与費(t)=n(0)×B(0)=給与原資 が成り立つ（等原資曲線上の点）。 */
+test("DIL-01 率を保つ側: n(5)=n(0)/(1+g)^5 かつ 等原資", () => {
+  for (const s of ALL) {
+    for (const g of [1.5, 2.5, 5]) {
+      const c = calcState(makeInput(s, { g }));
+      const f = Math.pow(1 + g / 100, 5), d = c.proj.dilemma;
+      assert.ok(near(d.keepRatio.n5, c.staffN / f, 1e-9), `${s} g=${g}: n5=${d.keepRatio.n5} ≠ staffN/(1+g)^5=${c.staffN / f}`);
+      const wage5 = c.B * f;                                   // 職員1人あたり給与費(5)
+      assert.ok(near(d.keepRatio.n5 * wage5, c.pool, 1e-6), `${s} g=${g}: n5×給与費(5)=${d.keepRatio.n5 * wage5} ≠ 原資=${c.pool}`);
+    }
+  }
+});
+
+/* ---- DIL-02 両側の値が定義どおり。率を保つ側の配置比率＝入所者÷(n(5)−その他職員) ----
+   人数を保つ側は推移表の5年後（率×(1+g)^5・総額×((1+g)^5−1)）と同じ。 */
+test("DIL-02 両面の値が定義どおり（人数を保つ側=推移表と一致・率を保つ側=配置比率）", () => {
+  for (const s of ALL) {
+    for (const g of [2, 4]) {
+      const c = calcState(makeInput(s, { g }));
+      const f = Math.pow(1 + g / 100, 5), d = c.proj.dilemma;
+      assert.ok(near(d.keepStaff.ratio, c.effRatio * f), `${s} g=${g}: 率(5)`);
+      assert.ok(near(d.keepStaff.deltaTotal, c.total * (f - 1)), `${s} g=${g}: 人件費増分`);
+      const core5 = d.keepRatio.n5 - c.otherStaff;
+      if (core5 > 0 && c.users > 0) assert.ok(near(d.keepRatio.ratio5, c.users / core5, 1e-9),
+        `${s} g=${g}: 配置比率(5)=${d.keepRatio.ratio5} ≠ users/(n5−その他)=${c.users / core5}`);
+    }
+  }
+});
+
+/* ---- DIL-03 g=0 では両面とも現在値に一致（→ UIはこのセクションを出さない）---- */
+test("DIL-03 g=0 では両面が現在値に一致", () => {
+  for (const s of ALL) {
+    const c = calcState(makeInput(s, { g: 0 })), d = c.proj.dilemma;
+    assert.ok(near(d.keepStaff.ratio, c.effRatio), `${s}: 率(5)=現在`);
+    assert.ok(near(d.keepStaff.deltaTotal, 0), `${s}: 人件費増分=0`);
+    assert.ok(near(d.keepRatio.n5, c.staffN), `${s}: n5=現在`);
+    assert.ok(near(d.keepRatio.ratio5, c.ratioActual, 1e-9), `${s}: 配置比率(5)=現在`);
+  }
+});
+
 /* ---- 不変条件21（v0.4）: 職種別人数と規模を固定すれば他の入力で nMinComp は不変 ---- */
 test("INV-21 職種別人数と規模を固定すれば nMinComp は不変", () => {
   for (const s of ALL) {

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>人件費トレードオフ・シミュレーター v0.4 | SWMD</title>
+<title>人件費トレードオフ・シミュレーター v0.5 | SWMD</title>
 <style>
 :root{
   --ink:#101F2B; --ink-2:#4A5C68; --paper:#E4EAEE; --surface:#FBFCFD; --rule:#C5D0D7;
@@ -72,6 +72,14 @@ svg{display:block;width:100%;height:auto;touch-action:none;cursor:ew-resize}
 .verdict p:last-child{margin-bottom:0}
 .verdict ul{margin:8px 0 0;padding-left:1.1em;font-size:13.5px}
 b.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.dilemma{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.dcard{border:1px solid var(--rule);border-radius:4px;padding:12px 14px;min-width:0}
+.dcard .dh{font-size:11.5px;color:var(--ink-2);letter-spacing:.02em;margin-bottom:6px;font-weight:600}
+.dcard p{margin:0 0 7px;font-size:13px;line-height:1.5}
+.dcard p:last-child{margin-bottom:0}
+.dcard .num{font-size:17px;font-weight:600}
+.dcard .s{font-size:11px;color:var(--ink-2)}
+@media(max-width:560px){.dilemma{grid-template-columns:1fr}}
 table{width:100%;min-width:34em;table-layout:fixed;border-collapse:collapse;font-size:13px}
 th,td{padding:6px 4px;border-bottom:1px solid var(--rule);text-align:right;vertical-align:middle}
 th{font-size:11px;font-weight:500;color:var(--ink-2);letter-spacing:.04em;white-space:nowrap}
@@ -108,7 +116,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
 <div class="wrap">
 
 <header class="masthead">
-  <div class="eyebrow">SWMD / Personnel Cost Trade-off　v0.4</div>
+  <div class="eyebrow">SWMD / Personnel Cost Trade-off　v0.5</div>
   <h1>人件費トレードオフ・シミュレーター</h1>
   <p class="lede">人件費の原資が決まると、職員数と賃金水準は同時には決められません。「基準どおりの配置」と「払える賃金」がどこでぶつかるのかを、サービス種別の配置基準と突き合わせて確かめます。</p>
 </header>
@@ -579,6 +587,21 @@ var SERVICES = {
         cutN: n > 0 ? n * (1 - 1 / fA) : 0      // 常勤換算を減らす（t年後の単価で吸収）
       }
     };
+    /* 同じジレンマの両面（5年後）。賃金が年率 g で上がるとき、原資を増やして人数を保つか、
+       原資を保って人数（＝配置）を落とすかの二択を数値で並べる。g=0 なら両方とも現在値に一致。
+       ・人数を保つ：人件費率(5)=率(0)×(1+g)^5、人件費増分=総額×((1+g)^5−1)（推移表と同じ）
+       ・率を保つ ：n(5)=n(0)/(1+g)^5（等原資曲線上の点＝n×給与費が原資と一定）、
+                    配置比率(5)=入所者数 ÷（n(5)−その他職員） */
+    var fD = grow(5);
+    var n5 = (fD > 0) ? n / fD : n, core5 = n5 - otherStaff;
+    proj.dilemma = {
+      t: 5,
+      keepStaff: { ratio: effRatio * fD, ratioNow: effRatio, deltaTotal: total * (fD - 1) },
+      keepRatio: {
+        nNow: n, n5: n5, ratioNow: ratioActual,
+        ratio5: (users > 0 && core5 > 0) ? users / core5 : 0
+      }
+    };
 
     /* 限界トレードオフ（v0.5: 非正規の賃金水準係数を廃したため、金額を正規/非正規で分ける
        トレードオフは削除。人数と原資の関係のみ残す） */
@@ -982,6 +1005,19 @@ function renderTrend(c){
       h += "<div class='row'><span class='k'>収入を増やす</span><span class='v'>＋"+man(a.revUp)+"（年率 "+a.rate.toFixed(1)+"％）</span></div>";
     h += "<div class='row'><span class='k'>常勤換算を減らす</span><span class='v'>−"+n1(a.cutN)+" 人</span></div>";
     h += "<div class='row'><span class='k'>昇給カーブを抑える</span><span class='v'>年上昇率 "+p.g.toFixed(1)+"％ を下げる</span></div>";
+    /* 同じジレンマの両面（5年後）。g>0 のときだけ出す（g=0 は両方とも現在値で意味がない）。
+       上の前提文（収入横ばい・報酬改定を織り込まない）の適用範囲に、この2枚も含まれる配置。 */
+    var d = p.dilemma;
+    h += "<p style='margin-top:14px;font-weight:600'>同じジレンマの両面（"+d.t+"年後）</p>";
+    h += "<div class='dilemma'>";
+    h += "<div class='dcard'><div class='dh'>人数を保つ場合</div>" +
+         "<p>人件費率が <b class='num'>"+pct(d.keepStaff.ratio)+"</b> に上がります<span class='s'>（現在 "+pct(d.keepStaff.ratioNow)+"）</span></p>" +
+         "<p>人件費は <b class='num'>"+man(d.keepStaff.deltaTotal)+"</b> 増えます</p></div>";
+    h += "<div class='dcard'><div class='dh'>人件費率を保つ場合</div>" +
+         "<p>職員数が <b class='num'>"+n1(d.keepRatio.n5)+" 人</b> に減ります<span class='s'>（現在 "+n1(d.keepRatio.nNow)+" 人）</span></p>" +
+         "<p>配置比率は <b class='num'>"+(d.keepRatio.ratio5 > 0 ? n2(d.keepRatio.ratio5)+" : 1" : "–")+"</b> になります</p></div>";
+    h += "</div>";
+    h += "<p class='hint' style='margin-top:8px'>どちらも上と同じ前提（収入横ばい・報酬改定は織り込まない）です。原資を増やして人数を保つか、原資を保って配置を薄くするかの二択を示します。</p>";
   } else {
     h += "<p class='hint'>年間上昇率が 0.0％ のため推移は平坦です。2期分の決算から実績の伸び率を入れると動きます。</p>";
   }
@@ -1134,7 +1170,7 @@ function renderChart(c){
 /* ---------- 書き出し ---------- */
 function makeText(c){
   var L = [];
-  L.push("【人件費トレードオフ・シミュレーター v0.4】");
+  L.push("【人件費トレードオフ・シミュレーター v0.5】");
   L.push("サービス種別：" + c.svcName);
   c.svc.fields.forEach(function(f){ L.push("　" + f.label + "：" + sizes[f.k] + f.unit); });
   L.push("");

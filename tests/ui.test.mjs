@@ -317,3 +317,24 @@ test("UI-14 §6 配置の余裕は基準未達では出さず、充足時のみ�
   assert.ok(t.txt("#compliance").includes("満たしています"), `前提: 充足になっていない`);
   assert.ok(anchor().includes("配置の余裕"), `充足時に配置の余裕が出ていない: ${anchor()}`);
 });
+
+/* F1対応（段階3の代替）: 「同じジレンマの両面」は g>0 でだけ出す。g=0 は両側とも現在値のため出さず、
+   既存の「平坦です」案内を維持する。両側の値は proj.dilemma と一致する。 */
+test("UI-15 同じジレンマの両面は g>0 でのみ表示され、値が状態と一致する", () => {
+  const f1 = v => (Math.round(v * 10) / 10).toFixed(1);
+  const t = open();
+  const trend = () => t.txt("#trend");
+  // g=0（既定）: 出さない。平坦案内は維持。
+  assert.ok(!trend().includes("同じジレンマの両面"), `g=0で両面が出ている: ${trend()}`);
+  assert.ok(trend().includes("平坦です"), `g=0の平坦案内がない: ${trend()}`);
+  // g>0: 両側の見出しと値が出る。
+  t.set("g", 2.5);
+  assert.ok(trend().includes("同じジレンマの両面"), `g>0で両面が出ない`);
+  assert.ok(trend().includes("人数を保つ場合") && trend().includes("人件費率を保つ場合"), `両側の見出しがない`);
+  const c = stateOf(t), d = c.proj.dilemma;
+  assert.ok(trend().includes(f1(d.keepRatio.n5) + " 人"), `職員数(5)=${f1(d.keepRatio.n5)} 人 が本文にない: ${trend()}`);
+  assert.ok(trend().includes("収入横ばい"), `両面が前提（収入横ばい）の適用下にない`);
+  // g を 0 に戻すと消える
+  t.set("g", 0);
+  assert.ok(!trend().includes("同じジレンマの両面"), `g=0に戻して両面が残っている`);
+});

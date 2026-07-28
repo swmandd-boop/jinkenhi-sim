@@ -65,12 +65,18 @@ async function measure(width) {
       for (let i = 1; i < rects.length; i++) ov = Math.max(ov, rects[i - 1].right - rects[i].left);
       return { n: rects.length, ov };
     };
+    // 「同じジレンマの両面」2枚カード（g>0で表示）：文字が欠けず、狭幅では縦積みになること
+    const dcards = [...document.querySelectorAll("#trend .dcard")].map(e => {
+      const r = e.getBoundingClientRect();
+      return { top: Math.round(r.top), over: e.scrollWidth - e.clientWidth };
+    });
     return {
       innerWidth: window.innerWidth,
       pageScrollW: document.documentElement.scrollWidth,
       container: sc.clientWidth, table: tbl.offsetWidth, tblScrollW: sc.scrollWidth,
       names, inputs, trendYearRightMargin,
-      ratioTicks: rowOverlap('#chart [data-rt]'), headTicks: rowOverlap('#chart [data-nt]')
+      ratioTicks: rowOverlap('#chart [data-rt]'), headTicks: rowOverlap('#chart [data-nt]'),
+      dcards
     };
   });
 }
@@ -87,6 +93,10 @@ for (const w of [1280, 1440, 1680]) {
     assert.ok(m.ratioTicks.n >= 3, `${w}px: 配置比率の目盛りが少なすぎる（${m.ratioTicks.n}）`);
     assert.ok(m.ratioTicks.ov <= 1, `${w}px: 横軸 上段（配置比率）の目盛りラベルが重なっている（重なり ${m.ratioTicks.ov.toFixed(1)}px）`);
     assert.ok(m.headTicks.ov <= 1, `${w}px: 横軸 下段（常勤換算数）の目盛りラベルが重なっている（重なり ${m.headTicks.ov.toFixed(1)}px）`);
+    // 両面カード：2枚あり、標準幅では横並び（top が揃う）・文字が欠けない
+    assert.equal(m.dcards.length, 2, `${w}px: ジレンマ両面カードが2枚でない（${m.dcards.length}）`);
+    for (const d of m.dcards) assert.ok(d.over <= 1, `${w}px: 両面カードの文字が欠けている（超過 ${d.over}px）`);
+    assert.ok(Math.abs(m.dcards[0].top - m.dcards[1].top) <= 2, `${w}px: 両面カードが横並びになっていない`);
   });
 }
 
@@ -95,4 +105,8 @@ test("LAYOUT-narrow 狭幅：切って隠さず、横スクロールで逃がす
   for (const n of m.names) assert.ok(n.over <= 1, `狭幅: 職種名「${n.name}」が欠けている（超過 ${n.over}px）`);
   for (const i of m.inputs) assert.ok(i.over <= 1, `狭幅: 入力値「${i.v}」が欠けている（超過 ${i.over}px）`);
   assert.ok(m.tblScrollW > m.container + 1, `狭幅で横スクロールが出ていない（container ${m.container} / scrollW ${m.tblScrollW}）＝切れて隠れている疑い`);
+  // 両面カードは狭幅では縦積み（top がずれる）・文字が欠けない
+  assert.equal(m.dcards.length, 2, `狭幅: ジレンマ両面カードが2枚でない（${m.dcards.length}）`);
+  for (const d of m.dcards) assert.ok(d.over <= 1, `狭幅: 両面カードの文字が欠けている（超過 ${d.over}px）`);
+  assert.ok(Math.abs(m.dcards[0].top - m.dcards[1].top) > 2, `狭幅: 両面カードが縦積みになっていない（横並びのまま）`);
 });
