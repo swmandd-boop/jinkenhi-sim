@@ -210,7 +210,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
     <section class="chartbox">
       <h2>配置比率と賃金のトレードオフ</h2>
       <p class="chartnote">横軸は職員数（常勤換算・正規＋非正規＋派遣）で、対応する配置比率（介護・看護 対 入所者）を上段に併記します。曲線は人件費総額÷職員数の双曲線（＝1人あたり給与費）。琥珀色の点を左右にドラッグすると介護・看護の人数だけが動き（その他職員は固定）、手厚くするほど1人あたり給与費が下がります。左（薄い側）が基準割れです。賃金下限は額面入力を事業主負担込み（×(1+法定福利費率)）に換算した位置に引きます。</p>
-      <svg id="chart" viewBox="0 0 640 400" role="img" aria-label="配置比率と職員1人あたり給与費のトレードオフ曲線"></svg>
+      <svg id="chart" viewBox="0 0 640 400" role="img" aria-label="職員数と1人あたり給与費のトレードオフ曲線"></svg>
       <div class="legend">
         <span><i style="border-color:var(--take)"></i>基準内かつ賃金下限を満たす区間</span>
         <span><i style="border-color:var(--ai);border-top-style:dashed"></i>賃金下限</span>
@@ -1109,8 +1109,8 @@ function ratioAxis(c){
 }
 /* 人数空間の軸（段階2追）: 配置比率 rmax..rmin に対応する職員数 n を左右端にとる。
    薄い側(rmax)=小さいn=左、手厚い側(rmin)=大きいn=右。基準線は基準比率に対応する n。
-   横軸を人数にすると等原資曲線 給与原資÷n が双曲線として見える（比率軸だと反比例が
-   打ち消されてほぼ直線になるため・段階2の実測で判明）。 */
+   横軸を人数にすると曲線 人件費総額÷n（＝1人あたり給与費A）が双曲線として見える（比率軸だと
+   反比例が打ち消されてほぼ直線になるため・段階2の実測で判明）。 */
 function nAxis(c){
   var ax = ratioAxis(c);
   if (!ax || !(c.coreN > 0)) return null;
