@@ -56,6 +56,7 @@ input[readonly]{background:#EEF2F5;color:var(--ink-2)}
 svg{display:block;width:100%;height:auto;touch-action:none;cursor:ew-resize}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:11.5px;color:var(--ink-2)}
 .legend i{display:inline-block;width:18px;height:0;border-top-width:2px;border-top-style:solid;vertical-align:middle;margin-right:5px}
+.legend i.sw{height:10px;border-top:0;background:rgba(178,58,46,.10);border:1px solid rgba(178,58,46,.35)}
 .ratiobar{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--rule);
   border:1px solid var(--rule);border-radius:3px;margin-top:16px;overflow:hidden}
 .cell{background:#fff;padding:11px 13px}
@@ -220,6 +221,8 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
       <svg id="chart" viewBox="0 0 640 400" role="img" aria-label="職員数と1人あたり給与費のトレードオフ曲線"></svg>
       <div class="legend">
         <span id="lg-band"><i style="border-color:var(--take)"></i>基準内かつ賃金下限を満たす区間</span>
+        <span id="lg-dash"><i style="border-color:#9FB0BC;border-top-style:dashed"></i>同じ人件費で取り得る組み合わせ</span>
+        <span id="lg-fill"><i class="sw"></i>基準を下回る領域（成立範囲の外）</span>
         <span><i style="border-color:var(--ai);border-top-style:dashed"></i>賃金下限</span>
         <span id="lg-base"><i style="border-color:var(--shu);border-top-style:dashed"></i>基準線（配置比率）</span>
         <span><i style="border-color:var(--kohaku)"></i>いまの置き方</span>
@@ -1257,10 +1260,21 @@ function renderChart(c){
   }
 
   /* 等・人件費総額の曲線 y=人件費総額÷n（双曲線・＝1人あたり給与費A）。全域を破線、基準内かつ賃金下限以上を太実線。 */
+  /* ★等間隔サンプリングだけだと、条件が切り替わる境界（基準ちょうど・賃金下限ちょうど）が
+     サンプル点に乗らず、帯の端が最大1サンプル分ずれる。基準ちょうどの配置（＝起動時の初期状態）で
+     点が帯からわずかに外れて見えてしまうため、境界の n を明示的にサンプルへ加える。 */
+  var bounds = [c.nMinComp, (c.atgt > 0 ? c.total / c.floorA : null), nx.nbase];
   function seg(cond){
+    var pts = [], i;
+    for (i = 0; i <= 120; i++) pts.push(nx.nmin + (nx.nmax - nx.nmin)*i/120);
+    for (i = 0; i < bounds.length; i++){
+      var v = bounds[i];
+      if (v != null && isFinite(v) && v > nx.nmin && v < nx.nmax) pts.push(v);
+    }
+    pts.sort(function(a, b){ return a - b; });
     var d = "", first = true;
-    for (var s = 0; s <= 120; s++){
-      var n = nx.nmin + (nx.nmax - nx.nmin)*s/120, y = c.total/n, R = ENGINE.ratioAtFteAll(c, n);
+    for (i = 0; i < pts.length; i++){
+      var n = pts[i], y = c.total/n, R = ENGINE.ratioAtFteAll(c, n);
       var on = (y > 0 && y <= ymax*1.02) && (!cond || cond(R, y, n));
       if (!on){ first = true; continue; }
       d += (first?"M":"L") + X(n).toFixed(1) + " " + Y(y).toFixed(1) + " ";
@@ -1269,17 +1283,20 @@ function renderChart(c){
     return d;
   }
   svg.appendChild(el("path",{d:seg(null),fill:"none",stroke:"#9FB0BC","stroke-width":1.5,"stroke-dasharray":"3 3"}));
-  /* 太実線＝「ここなら成立する」区間。基準内 かつ 賃金下限以上。
-     ★基準の判定はサービスによって物差しが違うだけで、意味は同じ：
-       比率基準あり → 配置比率が基準以下（R <= 基準）
-       比率基準なし → 職員数が基準の単純合計以上（n >= nbase）
-     以前は比率基準の無いサービスで基準による切り出しをしておらず、基準を割った領域まで
-     帯が伸びて「そこも成立する」と読めてしまった（充足判定パネルは同時に「下回っています」と
-     出るため、同じ画面が逆の合図を出していた）。 */
+  /* 太実線＝「ここなら成立する」区間。**職種別の基準を満たす** かつ 賃金下限以上。
+     ★基準の判定には nMinComp（いまの職種構成のまま人数を増減させたとき、全職種が基準を
+       満たす最小の合計）を使う。合計の単純合計 stdN で切ると、caveat に書いた
+       「事務や調理を厚くすれば合計を満たしたまま介護・看護が基準を割る／合計の下限だけでは
+       判定できません」と矛盾する（合計は足りているのに職種別は未達、という構成で帯の内側に
+       入ってしまう）。nMinComp は職種別の判定を人数に翻訳した値なので caveat と一致する。
+     ★現在地では 充足 ⟺ n >= nMinComp が厳密に成り立つ（sMin<=1 ⟺ nMinComp<=fteAll）ので、
+       点が帯の内側かどうかと充足判定パネルの結論は必ず一致する。
+     ★比率基準のあるサービスは R <= 基準 を AND で残す（比率は法令上の必要条件のため）。
+     ★基準のある職種が0人（blocked）だと nMinComp=∞ になり、帯は出ない（正しい）。 */
   var okBand = seg(function(R, y, n){
-    var inStd = nx.ax && nx.ax.base ? (R != null && R <= nx.ax.base + 1e-9)
-              : (nx.nbase == null || n >= nx.nbase - 1e-9);
-    return inStd && (!(c.atgt > 0) || y >= c.floorA - 1e-9);
+    var inRatio = (nx.ax && nx.ax.base) ? (R != null && R <= nx.ax.base + 1e-9) : true;
+    var inStd   = isFinite(c.nMinComp) && n >= c.nMinComp - 1e-9;
+    return inRatio && inStd && (!(c.atgt > 0) || y >= c.floorA - 1e-9);
   });
   if (okBand) svg.appendChild(el("path",{d:okBand,fill:"none",stroke:"#2A7F72","stroke-width":4,"stroke-linecap":"round"}));
   else if (c.atgt > 0) svg.appendChild(el("text",{x:VB.l+PW/2,y:VB.t+PH/2,"text-anchor":"middle","font-size":13,fill:"#B23A2E","font-weight":"600"},"両立する区間なし"));

@@ -751,3 +751,61 @@ test("AXB-09 凡例は、同じ意味の要素を同じ語で呼び、違う意�
   }
   assert.notEqual(facts.tsuusho.legendBase, facts.tokuyou.legendBase, `違う意味の基準線が同じ語で呼ばれている`);
 });
+
+/* AXB-10（2026-07-28・release-gate 第4回 I1 への対応）:
+   緑の帯の基準判定を nMinComp（いまの職種構成のまま人数を増減させたとき全職種が基準を満たす
+   最小の合計）にした。合計の単純合計 stdN で切ると、caveat の「事務や調理を厚くすれば合計を
+   満たしたまま介護・看護が基準を割る／合計の下限だけでは判定できません」と矛盾する。
+   ★現在地では 充足 ⟺ n >= nMinComp（sMin<=1 ⟺ nMinComp<=fteAll）が厳密に成り立つので、
+     点が帯の内側かどうかと充足判定パネルの結論は必ず一致する。偏った構成でも成り立つことを固定。
+   ★境界（基準ちょうど＝起動時の初期状態）で点が帯から外れて見えないよう、seg() は条件が
+     切り替わる n を明示的にサンプルへ入れている。初期状態も本テストで踏む。 */
+function bandRange(t) {
+  const p = [...t.d.querySelectorAll("#chart path")].find(e => e.getAttribute("stroke") === "#2A7F72");
+  if (!p) return null;
+  const xs = (p.getAttribute("d").match(/[ML]([\d.]+)/g) || []).map(v => parseFloat(v.slice(1)));
+  return xs.length ? { min: Math.min(...xs), max: Math.max(...xs) } : null;
+}
+test("AXB-10 点が緑の帯の内側かどうかと、充足判定パネルの結論が必ず一致する", () => {
+  const cases = [
+    ["tsuusho", "介護2.0/その他6.0（合計は基準以上・職種別は未達）", t => { t.row(0, "n", 2.0); t.row(2, "n", 6.0); }],
+    ["tsuusho", "基準どおり（起動時＝境界）", () => {}],
+    ["tsuusho", "全体的に厚い", t => { t.row(0, "n", 9); t.row(1, "n", 3); t.row(2, "n", 5); }],
+    ["tokuyou", "その他だけ薄い", t => { t.row(2, "n", 1.0); }],
+    ["tokuyou", "介護だけ薄い", t => { t.row(0, "n", 10); }],
+    ["tokuyou", "基準どおり（起動時＝境界）", () => {}],
+    ["roken",   "看護0（基準のある職種が0人）", t => { t.row(1, "n", 0); }],
+    ["roken",   "基準どおり（起動時＝境界）", () => {}],
+    ["unit",    "基準どおり（起動時＝境界）", () => {}],
+    ["unit",    "全体的に厚い", t => { t.row(0, "n", 40); t.row(1, "n", 6); t.row(2, "n", 8); }]
+  ];
+  for (const [svc, label, mut] of cases) {
+    const t = open();
+    t.svc(svc);
+    t.set("atgt", 300);
+    mut(t);
+    const c = stateOf(t);
+    const b = bandRange(t), pt = t.d.querySelector('#chart [data-o="point"]');
+    const px = pt ? parseFloat(pt.getAttribute("cx")) : null;
+    const compliant = t.txt("#compliance h3").includes("満たしています");
+    const wageOk = c.avg >= c.floorA - 1e-9;
+    const expect = compliant && wageOk;                  // 帯は「基準を満たす」かつ「賃金下限以上」
+    const inBand = b != null && px != null && px >= b.min - 0.6 && px <= b.max + 0.6;
+    assert.equal(inBand, expect,
+      `[${svc}] ${label}: 充足=${compliant} 賃金OK=${wageOk} → 帯の内側であるべき=${expect} だが実際=${inBand}`);
+  }
+});
+
+test("AXB-11 凡例に破線と塗りの読み方がある（見えるが成立範囲でない領域の説明）", () => {
+  for (const svc of ["tsuusho", "tokuyou"]) {
+    const t = open();
+    t.svc(svc);
+    const items = [...t.d.querySelectorAll(".legend span")].map(e => e.textContent.trim());
+    assert.ok(items.some(x => x.includes("同じ人件費で取り得る組み合わせ")),
+      `${svc}: 破線の説明が凡例にない: ${JSON.stringify(items)}`);
+    assert.ok(items.some(x => x.includes("基準を下回る領域")),
+      `${svc}: 塗りの説明が凡例にない: ${JSON.stringify(items)}`);
+    // 塗りの見本は線ではなく面（専用クラス）
+    assert.ok(t.d.querySelector("#lg-fill i.sw"), `${svc}: 塗りの凡例の見本が面になっていない`);
+  }
+});
