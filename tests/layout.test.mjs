@@ -81,6 +81,23 @@ async function measure(width) {
       return { left: Math.round(r.left), width: Math.round(r.width), top: Math.round(r.top),
                over: e.scrollWidth - e.clientWidth };
     };
+    /* 金額の単位を「万円」→「万円／年」に伸ばしたぶん（2026-07-29）、数値が折り返す・欠ける
+       箇所が出ていないかを実ピクセルで見る。対象は金額が出る要素と、その入れ物。 */
+    const overs = (sel) => [...document.querySelectorAll(sel)]
+      .map(e => ({ t: e.textContent.trim().slice(0, 40), over: e.scrollWidth - e.clientWidth }));
+    const moneyOver = [].concat(
+      overs(".readout .row .v"),          // 職員給与原資・派遣費用など
+      overs("#marginal .row .k"),         // 「…必要な追加人件費（法人全体）」＝伸びた見出し
+      overs("#marginal .row .v"),         // 「307 万円／年」
+      overs("#ratiobar .cell .s"),             // 指標バーの補足「万円／年　人件費総額÷…」
+      overs(".field .inline")             // 入力欄＋単位（万円／年）の行
+    );
+    /* SVG 内の文字（軸ラベル・賃金下限ラベル・現在地）が viewBox からはみ出していないか。
+       はみ出すと端が切れて読めなくなる。viewBox は 0 0 640 400。 */
+    const svgOver = [...document.querySelectorAll("#chart text")].map(e => {
+      let b; try { b = e.getBBox(); } catch { return { t: "", over: 0 }; }
+      return { t: e.textContent.slice(0, 30), over: Math.max(0, Math.round(b.x + b.width - 640), Math.round(-b.x)) };
+    });
     const cols = document.querySelector(".cols").getBoundingClientRect();
     const leftCol = document.querySelector(".cols > div:first-child").getBoundingClientRect();
     const foot = document.querySelector("footer.site-footer");
@@ -96,6 +113,7 @@ async function measure(width) {
       footerInLeftCol: !!document.querySelector(".cols > div:first-child footer.site-footer"),
       disclaimOver: (() => { const e = foot && foot.querySelector(".disclaim"); return e ? e.scrollWidth - e.clientWidth : 0; })(),
       contactOver:  (() => { const e = foot && foot.querySelector(".contact"); return e ? e.scrollWidth - e.clientWidth : 0; })(),
+      moneyOver, svgOver,
       caveat: box(".caveat"),
       caveatOutsideCols: !document.querySelector(".cols .caveat")
     };
@@ -129,6 +147,9 @@ for (const w of [1280, 1440, 1680]) {
     assert.ok(m.caveat.width >= m.colsWidth - 2, `${w}px: 前提と出典の扱いが全幅でない（${m.caveat.width} < ${m.colsWidth}）`);
     assert.ok(m.caveat.width > m.leftColWidth * 1.5, `${w}px: 前提と出典の扱いが片カラム幅のまま（${m.caveat.width}）`);
     assert.ok(m.caveat.over <= 1, `${w}px: 前提と出典の扱いの文字が欠けている（超過 ${m.caveat.over}px）`);
+    // 金額の単位「万円／年」で数値が欠けないこと（2026-07-29 の単位追記）
+    for (const x of m.moneyOver) assert.ok(x.over <= 1, `${w}px: 金額表示「${x.t}」が欠けている（超過 ${x.over}px）`);
+    for (const x of m.svgOver)   assert.ok(x.over <= 1, `${w}px: グラフ内の文字「${x.t}」が描画域からはみ出している（${x.over}px）`);
   });
 }
 
@@ -145,6 +166,8 @@ test("LAYOUT-narrow 狭幅：切って隠さず、横スクロールで逃がす
   assert.ok(m.footerInLeftCol, `狭幅: 免責・問い合わせが左カラムに入っていない`);
   assert.ok(m.disclaimOver <= 1, `狭幅: 免責一文が欠けている（超過 ${m.disclaimOver}px）`);
   assert.ok(m.contactOver <= 1, `狭幅: 問い合わせ導線が欠けている（超過 ${m.contactOver}px）`);
+  for (const x of m.moneyOver) assert.ok(x.over <= 1, `狭幅: 金額表示「${x.t}」が欠けている（超過 ${x.over}px）`);
+  for (const x of m.svgOver)   assert.ok(x.over <= 1, `狭幅: グラフ内の文字「${x.t}」が描画域からはみ出している（${x.over}px）`);
   assert.ok(m.caveat.over <= 1, `狭幅: 前提と出典の扱いの文字が欠けている（超過 ${m.caveat.over}px）`);
   assert.ok(m.caveatOutsideCols, `狭幅: 前提と出典の扱いが .cols の中に残っている`);
 });
@@ -158,10 +181,13 @@ test("LAYOUT-mobile iPhone幅でページ本体が横に広がらない（表は
     const s = document.querySelector(".tbl-scroll");
     return {
       inner: window.innerWidth, pageScrollW: document.documentElement.scrollWidth,
-      tblContainer: s.clientWidth, tblScrollW: s.scrollWidth
+      tblContainer: s.clientWidth, tblScrollW: s.scrollWidth,
+      moneyOver: [...document.querySelectorAll(".readout .row .v,#marginal .row .k,#marginal .row .v,#ratiobar .cell .s,.field .inline")]
+        .map(e => ({ t: e.textContent.trim().slice(0, 40), over: e.scrollWidth - e.clientWidth }))
     };
   });
   assert.ok(m.pageScrollW <= m.inner + 1, `iPhone幅: ページ本体が横にはみ出している（scrollW ${m.pageScrollW} / inner ${m.inner}）`);
   assert.ok(m.inner <= 391, `iPhone幅: 本体幅が device-width(390) を超えて広がっている（inner ${m.inner}）`);
   assert.ok(m.tblScrollW > m.tblContainer + 1, `iPhone幅: 職種表が .tbl-scroll 内で横スクロールできない（切れて隠れている疑い）`);
+  for (const x of m.moneyOver) assert.ok(x.over <= 1, `iPhone幅: 金額表示「${x.t}」が欠けている（超過 ${x.over}px）`);
 });

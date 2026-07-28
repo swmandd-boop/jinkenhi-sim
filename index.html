@@ -149,17 +149,17 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
       <h2>原資を決める<span class="tag">STEP 2</span></h2>
       <div class="field">
         <label for="rev">年間サービス活動収益</label>
-        <div class="inline"><input type="number" id="rev" value="37000" step="100" min="0"><span class="unit">万円</span><span class="samp">初期値はサンプル・未検証</span></div>
+        <div class="inline"><input type="number" id="rev" value="37000" step="100" min="0"><span class="unit">万円／年</span><span class="samp">初期値は入力例</span></div>
         <p class="hint"><b>決算書から転記してください。</b>介護報酬・利用者負担・加算等を含む年間の事業収益です。</p>
       </div>
       <div class="field">
         <label for="total">年間人件費総額（法定福利費込み）</label>
-        <div class="inline"><input type="number" id="total" value="23791" step="100" min="0"><span class="unit">万円</span><span class="samp">初期値はサンプル・未検証</span></div>
+        <div class="inline"><input type="number" id="total" value="23791" step="100" min="0"><span class="unit">万円／年</span><span class="samp">初期値は入力例</span></div>
         <p class="hint"><b>決算書から転記してください。</b>給与費に事業主負担の法定福利費を含めた総額です（派遣職員費も含む）。</p>
       </div>
       <div class="field">
         <label for="haken-fee">　うち派遣職員費</label>
-        <div class="inline"><input type="number" id="haken-fee" value="0" step="100" min="0"><span class="unit">万円</span></div>
+        <div class="inline"><input type="number" id="haken-fee" value="0" step="100" min="0"><span class="unit">万円／年</span></div>
         <p class="hint">人件費総額の<b>内数</b>です（社会福祉法人会計基準では人件費の中科目）。派遣費は事業主負担を派遣会社が持つため、職員給与原資を出すときは法定福利費を割り戻しません。</p>
       </div>
       <div class="field">
@@ -191,7 +191,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
       </div>
       <div class="field">
         <label for="atgt">下回れない平均年収</label>
-        <div class="inline"><input type="number" id="atgt" value="400" step="5" min="0"><span class="unit">万円</span></div>
+        <div class="inline"><input type="number" id="atgt" value="400" step="5" min="0"><span class="unit">万円／年</span></div>
         <p class="hint">地域相場、または現在の平均年収を入れます。ここを下げれば人は増やせます。</p>
       </div>
       <div class="field">
@@ -207,7 +207,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
 
     <!-- 免責・問い合わせ・版数：左カラムの最後（STEP3の下）。ページ末尾より上に置き、見落とされにくくする -->
     <footer class="site-footer">
-    <p class="disclaim">本ツールは福祉施設の人件費配分を検討するための参考シミュレーションです。初期値には未検証のサンプル値（収益・人件費総額・法定福利費率など）を含みます。配置基準の記載は主要職種の一般的な基準の要約で、加算要件・自治体の上乗せ条例・兼務・みなし配置・経過措置は反映しておらず、<b>指定権者の解釈を代替するものではありません</b>。本ツールは経営判断のための材料を示すもので、<b>判断そのものを行うものではありません</b>。実際の配置・賃金・収支は、決算書の実額と所轄庁の指導に基づいてご判断ください。<b>利用者・職員の個人情報は入力しないでください</b>（入力欄は集計値のみで、入力した値はブラウザの外に送信されません）。</p>
+    <p class="disclaim">本ツールは福祉施設の人件費配分を検討するための参考シミュレーションです。収益・人件費総額の初期値は入力例です。自法人の決算書の実額に置き換えてください。法定福利費率などの既定値には未検証のサンプル値を含みます。配置基準の記載は主要職種の一般的な基準の要約で、加算要件・自治体の上乗せ条例・兼務・みなし配置・経過措置は反映しておらず、<b>指定権者の解釈を代替するものではありません</b>。本ツールは経営判断のための材料を示すもので、<b>判断そのものを行うものではありません</b>。実際の配置・賃金・収支は、決算書の実額と所轄庁の指導に基づいてご判断ください。<b>利用者・職員の個人情報は入力しないでください</b>（入力欄は集計値のみで、入力した値はブラウザの外に送信されません）。</p>
     <p class="contact"><a href="https://forms.gle/nZd22V4geA5LAGVB8" target="_blank" rel="noopener">この結果の読み解き、改善の方向性についてご相談いただけます</a></p>
     <p class="org">© 株式会社福祉マネジメント＆デザイン　人件費トレードオフ・シミュレーター v0.5</p>
     </footer>
@@ -351,7 +351,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
       <li><b>1人あたり給与費＝人件費総額 ÷ 職員数（正規＋非正規＋派遣）</b>です。分子に事業主負担の法定福利費と派遣職員費を含むため、分母にも派遣を入れて揃えています（v0.5で指標をAに一本化）。</li>
       <li>既定の16.5％は健康保険・厚生年金・雇用保険・労災の<b>事業主負担分のおおよその合計</b>です。<b>退職共済掛金や退職給付引当は含んでいません。</b><b>決算書の「法定福利費」を「給与費」で割れば、自法人の実際の負担率が出ます。</b>その実額に置き換えてお使いください。</li>
       <li>決算書の人件費には<b>役員報酬・退職給付費用・通勤手当</b>も入っています。職種表にこれらの行がないと、その分が既存職種に上乗せされ、1人あたり給与費が実態より高く出ます。金額が大きい場合は行を追加してください。</li>
-      <li><b>賃金下限は額面（求人票と同じ土俵）で入力します。</b>グラフ上では、A が事業主負担込みのため、賃金下限を<b>×(1+法定福利費率)</b>した位置に線を引き、ラベルに額面と事業主負担込みの両方を併記します（例：440万円 → 512.6万円）。</li>
+      <li><b>賃金下限は額面（求人票と同じ土俵）で入力します。</b>グラフ上では、A が事業主負担込みのため、賃金下限を<b>×(1+法定福利費率)</b>した位置に線を引き、ラベルに額面と事業主負担込みの両方を併記します（例：440万円／年 → 512.6万円／年）。</li>
     </ul>
     <h4>数値の検証状況</h4>
     <ul>
@@ -776,7 +776,10 @@ var scale = 1, sizes = {}, rows = [];
 
 var $ = function(id){ return document.getElementById(id); };
 var num = function(id){ var v = parseFloat($(id).value); return isFinite(v) ? v : 0; };
-function man(v){ return v.toLocaleString("ja-JP",{maximumFractionDigits:0}) + " 万円"; }
+/* 金額はすべて年額（決算書と同じ期間）。月額との混同を防ぐため単位に「／年」を含める。
+   man() の全呼び出し先が年額であることを確認したうえで、単位はここ1か所で持つ。
+   ※ yen() は「1人1日あたり収入」専用で年額ではない（ラベル側に「1人1日あたり」と明記）。 */
+function man(v){ return v.toLocaleString("ja-JP",{maximumFractionDigits:0}) + " 万円／年"; }
 function n1(v){ return (v == null || !isFinite(v)) ? "–" : (Math.round(v*10)/10).toLocaleString("ja-JP",{minimumFractionDigits:1,maximumFractionDigits:1}); }
 /* 入力欄の表示用。スライダー確定（比例配分）で生じる満精度の値を、合計列（n1・0.1単位）と
    同じ 0.1 単位に丸めて短く・欠けずに表示する。実配置 rows 自体は満精度のまま保持するので
@@ -856,7 +859,7 @@ function refreshTable(c){
 /* ---------- 数値パネル ---------- */
 function renderNumbers(c){
   $("o-wagepool").textContent = man(c.pool);                   // 職員給与原資（派遣除く）
-  $("o-hakenfee").textContent = c.hakenFee > 0 ? man(c.hakenFee) : "0 万円";
+  $("o-hakenfee").textContent = c.hakenFee > 0 ? man(c.hakenFee) : "0 万円／年";
   $("o-ratio").textContent    = c.rev > 0 ? pct(c.effRatio) : "収益 未入力";
   $("bench").textContent      = c.svc.bench + " ％";
   $("o-unitrev").textContent  = (c.users > 0 && c.rev > 0) ? yen(c.unitRev) : "–";
@@ -889,7 +892,7 @@ function renderRatio(c){
   var avgNote = (isFinite(c.nMinComp) && Math.abs(c.slackN) < 0.5)
     ? '<span class="samp">基準最小配置での参考値</span>' : '';
   cells += '<div class="cell"><span class="k">1人あたり給与費</span><span class="v">'+n1(c.A)+
-           '</span><span class="s">万円　人件費総額÷（正規＋非正規＋派遣）・事業主負担込み'+avgNote+'</span></div>';
+           '</span><span class="s">万円／年　人件費総額÷（正規＋非正規＋派遣）・事業主負担込み'+avgNote+'</span></div>';
   cells += '<div class="cell"><span class="k">正規比率</span><span class="v">'+c.regRatio.toFixed(1)+
            ' ％</span><span class="s">職員ベース（非正規 '+n1(c.nHi)+'／派遣 '+n1(c.nHk)+' 人）</span></div>';
   /* 配置比率のセルは「法令の比率基準があるサービス」でだけ出す（案B・水田さん判断 2026-07-28）。
@@ -947,10 +950,10 @@ function renderVerdict(c){
     box.className = "verdict no";
     h += "<h3>この原資では両立しません</h3>";
     h += "<p>常勤換算 <b class='num'>"+n1(c.nmin)+"</b> 人を賃金下限 <b class='num'>"+n1(c.atgt)+
-         "</b> 万円（事業主負担込み "+n1(c.floorA)+"万円）で雇うには人件費総額 <b class='num'>"+
+         "</b> 万円／年（事業主負担込み "+n1(c.floorA)+"万円／年）で雇うには人件費総額（法人全体） <b class='num'>"+
          man(c.needTotal)+"</b> が必要で、いまの人件費では <b class='num'>"+man(Math.abs(c.gap))+"</b> 足りません。</p>";
     h += "<p>いまの人件費で守れるのは、<b>人数なら "+n1(c.nCap)+" 人まで</b>か、<b>1人あたり給与費なら "+
-         n1(c.nmin > 0 ? c.total / c.nmin : 0)+" 万円まで</b>のどちらかです。</p><ul>";
+         n1(c.nmin > 0 ? c.total / c.nmin : 0)+" 万円／年まで</b>のどちらかです。</p><ul>";
     if (c.rev > 0) h += "<li>収益を変えずに両立させる → 人件費率 <b class='num'>"+pct(c.needRatio)+"</b>（現在 "+pct(c.effRatio)+"）</li>";
     if (c.effRatio > 0) h += "<li>人件費率を変えずに両立させる → 年間収益 <b class='num'>"+man(c.needRev)+"</b>（現在 "+man(c.rev)+"、差 "+man(c.needRev-c.rev)+"）</li>";
     h += "<li>どちらも動かせない → 配置か賃金のどちらを下げるかの判断になります</li></ul>";
@@ -960,11 +963,11 @@ function renderVerdict(c){
     h += "<p>この人件費なら、常勤換算 <b class='num'>"+n1(c.nmin)+"</b> 〜 <b class='num'>"+n1(c.nCap)+
          "</b> 人の範囲で両方の線を守れます。幅は <b class='num'>"+n1(c.nCap-c.nmin)+"</b> 人分です。</p>";
     if (c.okN && c.okA){
-      h += "<p>いまの置き方（<b class='num'>"+n1(c.n)+"</b> 人 / 1人あたり給与費 <b class='num'>"+n1(c.avg)+"</b> 万円）はこの範囲の中にあります。</p>";
+      h += "<p>いまの置き方（<b class='num'>"+n1(c.n)+"</b> 人 / 1人あたり給与費 <b class='num'>"+n1(c.avg)+"</b> 万円／年）はこの範囲の中にあります。</p>";
     } else {
       h += "<p><b>いまの置き方は範囲の外</b>です。";
       if (!c.okN) h += "人数が下限を "+n1(c.nmin-c.n)+" 人分下回っています。";
-      if (!c.okA) h += "1人あたり給与費が下限（事業主負担込み "+n1(c.floorA)+"万円）を "+n1(c.floorA-c.avg)+" 万円下回っています。";
+      if (!c.okA) h += "1人あたり給与費が下限（事業主負担込み "+n1(c.floorA)+"万円／年）を "+n1(c.floorA-c.avg)+" 万円／年 下回っています。";
       h += "</p>";
     }
   }
@@ -981,13 +984,13 @@ function renderNeedRatio(c){
      サンプル値（初期値400万）を根拠にした診断になる。§6 と同じく、入力前は数値を出さず促す。 */
   if (!atgtTouched){
     box.className = "verdict";
-    box.innerHTML = "<h3>必要人件費率</h3><p class='hint'>「下回れない平均年収」を入れると、譲れない線を守るのに必要な人件費率が出ます（初期値 " +
-      n1(c.atgt) + " 万円はサンプルで、これを根拠に診断すると未検証の値が判定基準になってしまいます）。</p>";
+    box.innerHTML = "<h3>必要人件費率</h3><p class='hint'>「下回れない平均年収」を入れると、譲れない線を守るのに必要な人件費率が出ます。初期値 " +
+      n1(c.atgt) + " 万円はサンプルです。</p>";
     return;
   }
   var h = "<h3>必要人件費率 <b class='num'>"+pct(c.needRatio)+"</b></h3>";
   h += "<p>配置下限 <b class='num'>"+n1(c.nmin)+"</b> 人を平均年収 <b class='num'>"+n1(c.atgt)+
-       "</b> 万円で守るには、人件費率が <b class='num'>"+pct(c.needRatio)+
+       "</b> 万円／年で守るには、人件費率が <b class='num'>"+pct(c.needRatio)+
        "</b> 必要です（現在 <b class='num'>"+pct(c.effRatio)+"</b>）。</p>";
   if (c.gapPt <= 1e-9){
     box.className = "verdict";
@@ -1020,10 +1023,10 @@ function renderAnchor(c){
   }
   if (atgtTouched){
     h += "<p>賃金の余裕：<b class='num'>×" + c.slackWage.toFixed(2) +
-         "</b>（下回れない平均年収 " + n1(c.atgt) + " 万円＝事業主負担込み " + n1(c.floorA) + " 万円 に対する1人あたり給与費 " + n1(c.avg) + " 万円）</p>";
+         "</b>（下回れない平均年収 " + n1(c.atgt) + " 万円／年＝事業主負担込み " + n1(c.floorA) + " 万円／年 に対する1人あたり給与費 " + n1(c.avg) + " 万円／年）</p>";
   } else {
-    h += "<p class='hint'>賃金の余裕を見るには「下回れない平均年収」を入れてください（初期値 " +
-         n1(c.atgt) + " 万円はサンプルで、これを基準に診断すると未検証の値が判定基準になってしまいます）。</p>";
+    h += "<p class='hint'>賃金の余裕を見るには「下回れない平均年収」を入れてください。初期値 " +
+         n1(c.atgt) + " 万円はサンプルです。</p>";
   }
   if (tight){
     box.className = "verdict no";
@@ -1089,11 +1092,16 @@ function renderTrend(c){
 
 function renderMarginal(c){
   var m = c.marg, h = "";
-  h += "<div class='row'><span class='k'>常勤換算を1人増やす</span><span class='v'>1人あたり給与費 −"+n1(m.perPerson)+" 万円</span></div>";
-  h += "<div class='row'><span class='k'>1人あたり給与費を10万円上げる：必要な追加人件費</span><span class='v'>"+man(m.needMoreTotal)+"</span></div>";
+  /* 分母の明示：1人あたりの額と法人全体の額が同じ表に並ぶので、どちらの分母かを見出し側で言う。
+       perPerson    = total/n − total/(n+1)        → 1人あたり（A の変化幅）
+       needMoreTotal= n × 10                        → 法人全体（職員数ぶんの積み上げ）
+       revUp        = needMoreTotal ÷ (人件費率/100) → 法人全体（上の額を収益に換算）
+     いずれも engine の式から確認したもので、推測ではない。 */
+  h += "<div class='row'><span class='k'>常勤換算を1人増やす</span><span class='v'>1人あたり給与費 −"+n1(m.perPerson)+" 万円／年</span></div>";
+  h += "<div class='row'><span class='k'>1人あたり給与費を10万円／年 上げる：必要な追加人件費（法人全体）</span><span class='v'>"+man(m.needMoreTotal)+"</span></div>";
   h += "<div class='row'><span class='k'>　同じことを人員削減でまかなうなら</span><span class='v'>常勤換算 −"+n1(m.cutN)+" 人</span></div>";
   if (c.rev > 0) h += "<div class='row'><span class='k'>　人件費率で吸収するなら</span><span class='v'>＋"+m.ptUp.toFixed(1)+" ポイント</span></div>";
-  if (c.effRatio > 0) h += "<div class='row'><span class='k'>　収益増でまかなうなら</span><span class='v'>＋"+man(m.revUp)+"</span></div>";
+  if (c.effRatio > 0) h += "<div class='row'><span class='k'>　収益増でまかなうなら（法人全体）</span><span class='v'>＋"+man(m.revUp)+"</span></div>";
   h += "<p class='hint' style='margin-top:10px'>賃金制度を見直すときは、原資の出どころ（人件費率か収益か人員か）を先に決めます。等級や評価の設計は、原資が決まったあとの配分の話です。</p>";
   $("marginal").innerHTML = h;
 }
@@ -1234,7 +1242,7 @@ function renderChart(c){
   }
   svg.appendChild(el("line",{x1:VB.l,x2:VB.l+PW,y1:VB.t+PH,y2:VB.t+PH,stroke:"#101F2B","stroke-width":1.5}));
   svg.appendChild(el("line",{x1:VB.l,x2:VB.l,y1:VB.t,y2:VB.t+PH,stroke:"#101F2B","stroke-width":1.5}));
-  svg.appendChild(el("text",{x:VB.l,y:VB.t-6,"font-size":10.5,fill:"#4A5C68"},"1人あたり給与費（万円・事業主負担込み）"));
+  svg.appendChild(el("text",{x:VB.l,y:VB.t-6,"font-size":10.5,fill:"#4A5C68"},"1人あたり給与費（万円／年・事業主負担込み）"));
 
   /* 横軸の目盛り（案B）。
      - 比率基準あり：上段＝配置比率／下段＝対応する常勤換算数 の2段。位置は人数空間なので
@@ -1335,7 +1343,7 @@ function renderChart(c){
   /* 賃金下限（横線）＝額面入力を事業主負担込み floorA に換算した位置。ラベルは両方を併記して誤読を防ぐ。 */
   if (c.atgt > 0 && c.floorA < ymax){
     svg.appendChild(el("line",{x1:VB.l,x2:VB.l+PW,y1:Y(c.floorA),y2:Y(c.floorA),stroke:"#1B4965","stroke-width":1.4,"stroke-dasharray":"6 4","data-o":"wage"}));
-    svg.appendChild(el("text",{x:VB.l+PW-4,y:Y(c.floorA)-6,"text-anchor":"end","font-size":10.5,fill:"#1B4965"},"賃金下限 "+n1(c.atgt)+"万円（事業主負担込み "+n1(c.floorA)+"万円）"));
+    svg.appendChild(el("text",{x:VB.l+PW-4,y:Y(c.floorA)-6,"text-anchor":"end","font-size":10.5,fill:"#1B4965"},"賃金下限 "+n1(c.atgt)+"万円／年（事業主負担込み "+n1(c.floorA)+"万円）"));
   }
 
   /* いまの置き方の点（職員数 fteAll × 1人あたり給与費 A） */
@@ -1346,7 +1354,7 @@ function renderChart(c){
     svg.appendChild(el("circle",{cx:cx,cy:cy,r:5.5,fill:"#B8801F",stroke:"#fff","stroke-width":2,"data-o":"point"}));
     var right = cx > VB.l+PW*0.6;
     svg.appendChild(el("text",{x:cx+(right?-10:10),y:cy-16,"text-anchor":right?"end":"start","font-size":12,"font-weight":"600",fill:"#101F2B"},
-      (hasRatioStd(c) ? n2(c.ratioActual)+" : 1 ／ " : "")+n1(c.n)+"人 ／ "+n1(c.A)+"万円"));
+      (hasRatioStd(c) ? n2(c.ratioActual)+" : 1 ／ " : "")+n1(c.n)+"人 ／ "+n1(c.A)+"万円／年"));
   }
 }
 
@@ -1366,11 +1374,11 @@ function makeText(c){
         : c.shorts.length ? "未達 — " + c.shorts.map(function(x){ return x.name + " " + n1(x.gap) + "人不足"; }).join("、")
         : "すべての職種で基準以上"));
   if (isFinite(c.nMinComp)) L.push("　いまの構成で基準を満たす最小合計：" + n1(c.nMinComp) + " 人");
-  L.push("1人あたり給与費：" + n1(c.A) + " 万円（＝人件費総額÷職員数・事業主負担込み・派遣込み）");
-  L.push("賃金下限：" + n1(c.atgt) + " 万円（額面）＝事業主負担込み " + n1(c.floorA) + " 万円で比較");
+  L.push("1人あたり給与費：" + n1(c.A) + " 万円／年（＝人件費総額÷職員数・事業主負担込み・派遣込み）");
+  L.push("賃金下限：" + n1(c.atgt) + " 万円／年（額面）＝事業主負担込み " + n1(c.floorA) + " 万円／年で比較");
   L.push("");
   L.push("雇用区分：正規 " + n1(c.nSe) + " 人／非正規 " + n1(c.nHi) + " 人／派遣 " + n1(c.nHk) + " 人（正規比率 " + c.regRatio.toFixed(1) + "％）");
-  if (c.nHk > 0) L.push("　派遣費用 " + man(c.hakenFee) + "（1人あたり費用 " + n1(c.hakenUnit) + " 万・賃金ではなく委託費用）");
+  if (c.nHk > 0) L.push("　派遣費用 " + man(c.hakenFee) + "（1人あたり費用 " + n1(c.hakenUnit) + " 万円／年・賃金ではなく委託費用）");
   /* 配置比率は法令の比率基準があるサービスでだけ書き出す（指標バーと同じ理由：基準の無い
      通所で数字だけ出すと、比べる相手がないまま独り歩きする）。 */
   if (hasRatioStd(c) && c.coreN > 0 && c.users > 0){
@@ -1381,7 +1389,7 @@ function makeText(c){
   L.push("");
   L.push("※ 配置基準の自動計算は主要職種の要約であり、加算要件・自治体条例・経過措置は未反映。");
   L.push("※ 1人あたり給与費＝人件費総額÷職員数（正規＋非正規＋派遣）で事業主負担込み。賃金下限は額面入力を×(1+法定福利費)で比較。派遣は費用（賃金ではない）。");
-  L.push("※ 法定福利費率・収益・人件費総額の初期値はサンプル値（未検証）。");
+  L.push("※ 収益・人件費総額の初期値は入力例です。決算書の実額に置き換えてください。法定福利費率の初期値はサンプル値（未検証）。");
   L.push("※ 収益・人件費は決算書ベースで、処遇改善加算は分離していません。派遣職員費は人件費の内数。");
   return L.join("\n");
 }

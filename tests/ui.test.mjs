@@ -372,7 +372,9 @@ test("UI-17 画面の「職員数」を名乗る表示はすべて同一（fteAl
   assert.ok(Math.abs(N - (c.nSe + c.nHi + c.nHk)) < 1e-9, `fteAll≠正規+非正規+派遣`);
   assert.ok(Math.abs(parseFloat(t.d.getElementById("o-n").textContent) - N) < 0.05, `スライダーの職員数合計 o-n=${t.d.getElementById("o-n").textContent} ≠ ${f1(N)}`);
   assert.ok(Math.abs(parseFloat(t.d.getElementById("f-n").textContent) - N) < 0.05, `職種表 footer 合計 f-n ≠ ${f1(N)}`);
-  const pointLabel = [...t.d.querySelectorAll("#chart text")].map(e => e.textContent).find(s => s.includes("万円") && s.includes("人") && s.includes("／"));
+  /* 「万円」「人」「／」の3語一致だと軸ラベル（1人あたり給与費（万円／年…））も拾ってしまう。
+     現在地ラベルだけが持つ「<数字>人 ／ 」の並びで絞る（単位変更の前後どちらのDOMにも存在する形）。 */
+  const pointLabel = [...t.d.querySelectorAll("#chart text")].map(e => e.textContent).find(s => /\d人 ／ /.test(s));
   assert.ok(pointLabel && pointLabel.includes(f1(N) + "人"), `グラフの点の人数が fteAll でない: ${pointLabel}`);
   assert.ok(Math.abs(c.proj.dilemma.keepRatio.nNow - N) < 1e-9, `両面カードの現在職員数 ≠ fteAll`);
   assert.ok(t.txt("#trend").includes(f1(N) + " 人"), `両面カードに現在職員数 ${f1(N)} 人 が出ていない`);
@@ -912,4 +914,67 @@ test("AXB-15 帯の有無と朱色メッセージの有無は常に排他（4サ
   assert.equal(n, 120, `検証したケース数が想定と違う: ${n}`);
   assert.equal(both, 0, `帯と「区間がありません」が同時に出たケース: ${both}/${n}`);
   assert.equal(neither, 0, `帯も理由も出ないケース（画面が黙る）: ${neither}/${n}`);
+});
+
+/* ★2026-07-29 金額表示の期間単位。engine の返り値から機械的に主張を導き、
+   画面に出た文字列が「万円／年」で終わることを検査する（末尾一致）。
+   セレクタは既存の要素・既存の文言だけを使う（新設の目印に依存しない・教訓 E-018）。 */
+function moneyClaims(t){
+  const c = stateOf(t), man = v => Math.round(v).toLocaleString("ja-JP");
+  return [
+    { where: "#o-wagepool", label: "職員給与原資",        want: man(c.pool) + " 万円／年" },
+    { where: "#o-hakenfee", label: "派遣費用",            want: (c.hakenFee > 0 ? man(c.hakenFee) : "0") + " 万円／年" },
+    { where: "#marginal",   label: "必要な追加人件費",     want: man(c.marg.needMoreTotal) + " 万円／年" },
+    { where: "#marginal",   label: "収益増でまかなうなら", want: man(c.marg.revUp) + " 万円／年" }
+  ];
+}
+
+test("CLAIM-01 engine の金額は画面上で「万円／年」を伴って出る（4サービス）", () => {
+  for (const svc of ["tsuusho", "tokuyou", "unit", "roken"]) {
+    const t = open();
+    t.svc(svc);
+    for (const { where, label, want } of moneyClaims(t)) {
+      const got = t.txt(where);
+      assert.ok(got.includes(want), `${svc} ${label}: 「${want}」が画面に無い（実際: ${got.slice(0, 120)}）`);
+    }
+  }
+});
+
+test("CLAIM-02 金額を出す表示に「万円」だけで終わる箇所が無い（人数・率・ポイントは対象外）", () => {
+  for (const svc of ["tsuusho", "tokuyou", "unit", "roken"]) {
+    const t = open();
+    t.svc(svc);
+    t.set("atgt", 450);            // 賃金側の判定文を出す
+    t.set("g", 2.0);               // 推移・両面カードを出す
+    for (const sel of ["#verdict", "#need-ratio", "#anchor", "#marginal", "#trend", "#ratiobar"]) {
+      const s = t.txt(sel);
+      const bad = s.match(/万円(?!／年)/g);
+      assert.equal(bad, null, `${svc} ${sel}: 「万円」で終わる金額が ${bad && bad.length} 件ある → ${s.slice(0, 200)}`);
+    }
+  }
+});
+
+test("CLAIM-03 「いま動かすと何が起きるか」は1人あたりと法人全体を書き分ける", () => {
+  const t = open();
+  const s = t.txt("#marginal");
+  assert.ok(s.includes("1人あたり給与費 −"), `1人あたりの行が無い: ${s.slice(0, 150)}`);
+  assert.ok(/必要な追加人件費（法人全体）/.test(s), `追加人件費の分母（法人全体）が無い: ${s.slice(0, 200)}`);
+  assert.ok(/収益増でまかなうなら（法人全体）/.test(s), `収益増の分母（法人全体）が無い: ${s.slice(0, 200)}`);
+});
+
+/* ① 利用者が上書きする入力欄の初期値は「検証」の対象ではなく入力例。
+   一方、②の既定値（法定福利費率）に対する未検証の明示は残っていること。 */
+test("PUB-04 入力欄の初期値は「入力例」と呼び、「未検証」を名乗らない", () => {
+  const t = open();
+  const badges = [...t.d.querySelectorAll(".samp")].map(e => e.textContent);
+  const near = badges.filter(x => x.includes("初期値"));
+  assert.ok(near.length >= 2, `入力欄の初期値バッジが見つからない: ${JSON.stringify(badges)}`);
+  for (const b of near) assert.ok(!b.includes("未検証"), `入力欄の初期値バッジが「未検証」を名乗っている: ${b}`);
+  for (const sel of ["#need-ratio", "#anchor"]) {
+    const s = t.txt(sel);
+    assert.ok(!s.includes("未検証"), `${sel} の未入力時の促し文に「未検証」が残っている: ${s}`);
+  }
+  const dis = t.txt(".disclaim");
+  assert.ok(dis.includes("入力例"), `免責一文で入力欄の初期値が入力例と説明されていない`);
+  assert.ok(dis.includes("未検証のサンプル値"), `既定値（法定福利費率など）の未検証の明示が消えている`);
 });
