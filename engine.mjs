@@ -131,7 +131,7 @@ var SERVICES = {
   /* 入力 I（DOM非依存）から、画面に出す全数値を計算して返す。
      収益 rev・人件費総額 total はともに決算書からの実額入力。人件費率は total/rev で出力する。
      hakenFee は total の内数（派遣職員費）。職員給与原資 = (total − hakenFee)/(1+fuku)。
-     I = { service, sizes, week, rev, total, hakenFee, fuku, bonus,
+     I = { service, sizes, week, rev, total, hakenFee, fuku,
            scale, nminAuto, nminManual, atgt, g, rows:[{key,name,note,n,hi,haken}] } */
   function calcState(I){
     var svc = SERVICES[I.service];
@@ -170,15 +170,14 @@ var SERVICES = {
     });
     var staffBase = baseS + baseH, fteBase = staffBase + baseK;
     var nSe = baseS * scale, nHi = baseH * scale, nHk = baseK * scale;
-    var staffN = staffBase * scale;   // 職員数（正規＋非正規）
-    var fteAll = fteBase * scale;      // 常勤換算合計（派遣込み・配置基準に使う）
-    var n = staffN, pool = staffPool;  // グラフ・成立判定の人数と原資は「職員」（段階2で配置比率軸へ）
-    var A = fteAll > 0 ? total / fteAll : 0;                          // 1人あたり給与費（派遣込み・事業主負担込み）
-    var B = staffN > 0 ? staffPool / staffN : 0;                      // 職員1人あたり給与費（額面）
-    var avg = B;                                                     // 既存 chart/verdict 等の「平均年収」＝ B
-    var hakenUnit = nHk > 0 ? hakenFee / nHk : 0;                     // 派遣1人あたり費用
-    var staffUnitCost = staffN > 0 ? (total - hakenFee) / staffN : 0; // 職員1人あたり人件費（事業主負担込み）
-    var regRatio = staffN > 0 ? nSe / staffN * 100 : 0;              // 正規比率（正規÷職員）
+    var staffN = staffBase * scale;   // 正規＋非正規（正規比率の分母に使う内部量。画面の「職員数」ではない）
+    var fteAll = fteBase * scale;      // 職員数（正規＋非正規＋派遣）＝画面の「職員数」に一本化（v0.5: 指標をAへ）
+    var n = fteAll, pool = staffPool;  // 画面の職員数・グラフ横軸・各計算の人数はすべて fteAll に統一
+    var A = fteAll > 0 ? total / fteAll : 0;   // 1人あたり給与費 ＝ 人件費総額 ÷（正規＋非正規＋派遣）・事業主負担込み
+    var avg = A;                               // 画面の「1人あたり給与費」は A に一本化（額面Bは廃止）
+    var floorA = I.atgt * (1 + I.fuku / 100);  // 賃金下限（額面入力）を A軸（事業主負担込み）へ換算した位置
+    var hakenUnit = nHk > 0 ? hakenFee / nHk : 0;  // 派遣1人あたり費用（年収ではなく費用）
+    var regRatio = staffN > 0 ? nSe / staffN * 100 : 0;  // 正規比率（正規÷(正規＋非正規)）
 
     rows.forEach(function(r){
       r.totalFte  = (r.n + r.hi + r.haken) * scale;  // 配置は派遣込み
@@ -202,21 +201,21 @@ var SERVICES = {
     /* 配置比率（雇用形態を問わず合計で数える）。coreN は核職種（介護・看護）の常勤換算合計
        （派遣込み）。coreStaff は核の職員分（派遣を除く正規＋非正規）で、配置比率を動かしたとき
        Bの分母（職員数）がどう動くかを出すのに使う（§3/§4）。 */
-    var coreN = 0, coreStaff = 0;
+    var coreN = 0;
     if (svc.ratio) rows.forEach(function(r){
-      if (svc.ratio.roles.indexOf(r.key) >= 0){ coreN += r.totalFte; coreStaff += (r.n + r.hi) * scale; }
+      if (svc.ratio.roles.indexOf(r.key) >= 0){ coreN += r.totalFte; }
     });
-    var otherStaff = staffN - coreStaff;   // その他職員（配置比率ドラッグで固定される職員分）
+    var otherFte = fteAll - coreN;   // その他職員の常勤換算（派遣込み・配置比率ドラッグで固定）
     var ratioActual = (coreN > 0 && users > 0)
       ? (svc.ratio && svc.ratio.invert ? users / coreN : users / coreN) : 0;
     var ratioBad = !!(svc.ratio && svc.ratio.std && !svc.ratio.invert
                       && coreN > 0 && ratioActual > svc.ratio.std + 1e-9);
 
-    /* 成立判定 */
-    var nCap      = I.atgt > 0 ? pool / I.atgt : Infinity;
+    /* 成立判定。賃金下限は額面入力 atgt を A軸（事業主負担込み）に換算した floorA で判定する。
+       nCap＝賃金下限を守って雇える職員数(fteAll)の上限＝人件費総額 ÷ floorA（曲線 A=total/n が floorA を切る点）。 */
+    var nCap      = I.atgt > 0 ? total / floorA : Infinity;
     var feasible  = nmin <= nCap + 1e-9;
-    var needPool  = nmin * I.atgt;
-    var needTotal = needPool * (1 + I.fuku / 100);
+    var needTotal = nmin * floorA;   // 配置下限 × 賃金下限（事業主負担込み）＝守るのに要る人件費総額
     var effRatio  = rev > 0 ? total / rev * 100 : 0;
 
     /* 必要人件費率（新機能A）: 譲れない線（配置下限×下回れない平均年収）を守るのに
@@ -253,11 +252,11 @@ var SERVICES = {
        ・率を保つ ：n(5)=n(0)/(1+g)^5（等原資曲線上の点＝n×給与費が原資と一定）、
                     配置比率(5)=入所者数 ÷（n(5)−その他職員） */
     var fD = grow(5);
-    var n5 = (fD > 0) ? n / fD : n, core5 = n5 - otherStaff;
-    /* 人件費を保つ側は原資一定で賃金だけ上がり、職員（＝配置）が減る。配置比率が法令基準（3:1 等）を
+    var n5 = (fD > 0) ? n / fD : n, core5 = n5 - otherFte;
+    /* 人件費を保つ側は人件費総額一定で賃金だけ上がり、職員（＝配置）が減る。配置比率が法令基準（3:1 等）を
        割る年を出す。判定は svc.ratio.std がある場合のみ（法令基準に対してのみ・閾値は発明しない）。 */
     var stdR = (svc.ratio && svc.ratio.std) ? svc.ratio.std : null;
-    function ratioAtY(t){ var nt = n / grow(t), cr = nt - otherStaff; return (users > 0 && cr > 0) ? users / cr : 0; }
+    function ratioAtY(t){ var nt = n / grow(t), cr = nt - otherFte; return (users > 0 && cr > 0) ? users / cr : 0; }
     var r3 = ratioAtY(3), r5 = (users > 0 && core5 > 0) ? users / core5 : 0;
     var breachYear = null;
     if (stdR){ if (r3 > stdR + 1e-9) breachYear = 3; else if (r5 > stdR + 1e-9) breachYear = 5; }
@@ -272,14 +271,14 @@ var SERVICES = {
       }
     };
 
-    /* 限界トレードオフ（v0.5: 非正規の賃金水準係数を廃したため、金額を正規/非正規で分ける
-       トレードオフは削除。人数と原資の関係のみ残す） */
-    var up = 10, f1 = 1 + I.fuku / 100;
-    var needMoreTotal = n * up * f1;
+    /* 限界トレードオフ（v0.5: A に一本化。1人あたり給与費 A は事業主負担込みなので、A を10万上げる＝
+       人件費総額を 10×職員数 増やす。原資×(1+負担)の割り増しは不要）。 */
+    var up = 10;
+    var needMoreTotal = n * up;
     var marg = {
-      perPerson: n > 0 ? pool / n - pool / (n + 1) : 0,
+      perPerson: n > 0 ? total / n - total / (n + 1) : 0,   // 職員を1人増やすと A が何万下がるか
       needMoreTotal: needMoreTotal,
-      cutN: (avg + up) > 0 ? n - pool / (avg + up) : 0,
+      cutN: (avg + up) > 0 ? n - total / (avg + up) : 0,     // A を+10万するのを人員削減で賄うなら
       ptUp: rev > 0 ? needMoreTotal / rev * 100 : 0,
       revUp: effRatio > 0 ? needMoreTotal / (effRatio / 100) : 0
     };
@@ -287,20 +286,20 @@ var SERVICES = {
     return {
       service:I.service, svcName:svc.name, svc:svc, sizes:I.sizes, week:I.week,
       scale:scale,
-      fuku:I.fuku, bonus:I.bonus, atgt:I.atgt,
+      fuku:I.fuku, atgt:I.atgt,
       rev:rev, total:total, hakenFee:hakenFee, pool:pool, effRatio:effRatio, unitRev:unitRev,
       rows:rows, baseS:baseS, baseH:baseH, baseK:baseK, baseN:staffBase, stdN:stdN,
       n:n, nSe:nSe, nHi:nHi, nHk:nHk, staffN:staffN, fteAll:fteAll,
-      A:A, B:B, avg:avg,
-      hakenUnit:hakenUnit, staffUnitCost:staffUnitCost, regRatio:regRatio,
+      A:A, avg:avg, floorA:floorA,
+      hakenUnit:hakenUnit, regRatio:regRatio,
       sMin:sMin, nMinComp:nMinComp, shorts:shorts, blocked:blocked, nmin:nmin,
-      slackN: (isFinite(nMinComp) ? n - nMinComp : Infinity),  // 配置の余裕（人）
-      slackWage: (I.atgt > 0 ? avg / I.atgt : Infinity),        // 賃金の余裕（倍）
-      users:users, coreN:coreN, coreStaff:coreStaff, otherStaff:otherStaff,
+      slackN: (isFinite(nMinComp) ? n - nMinComp : Infinity),  // 配置の余裕（人・fteAll基準）
+      slackWage: (I.atgt > 0 ? avg / floorA : Infinity),        // 賃金の余裕（A ÷ 賃金下限(事業主負担込み)）
+      users:users, coreN:coreN, otherFte:otherFte,
       ratioActual:ratioActual, ratioBad:ratioBad,
       nCap:nCap, feasible:feasible,
-      okN: n >= nmin - 1e-9, okA: avg >= I.atgt - 1e-9,
-      needPool:needPool, needTotal:needTotal, gap: needTotal - total,
+      okN: n >= nmin - 1e-9, okA: avg >= floorA - 1e-9,
+      needTotal:needTotal, gap: needTotal - total,
       needRatio: needRatioV, needRev: needRevV,
       gapPt: gapPt, gapRev: gapRev, gapCutN: gapCutN,
       proj: proj, marg:marg
@@ -356,33 +355,32 @@ var SERVICES = {
     });
   }
 
-  /* 配置比率 R のときの職員数（正規＋非正規・派遣除く）。核を R へ按分すると核職員は
-     coreStaff×(users/R)/coreN 倍に動き、その他職員 otherStaff は固定なので
-     staffN(R) = coreStaff·users/coreN / R + otherStaff = a/R + b。派遣は職員数に含めない。 */
-  function staffNAtRatio(c, R){
-    if (!(R > 0) || !(c.coreN > 0)) return c.staffN;
-    var a = c.coreStaff * c.users / c.coreN, b = c.staffN - c.coreStaff;
-    return a / R + b;
+  /* 配置比率 R のときの職員数（正規＋非正規＋派遣＝fteAll）。coreN(R)=users/R で、その他職員の
+     常勤換算 otherFte（派遣込み）は核ドラッグで固定なので fteAll(R) = users/R + otherFte。
+     v0.5: 指標を A に一本化したため、職員数は派遣込み(fteAll)で数える。 */
+  function fteAllAtRatio(c, R){
+    if (!(R > 0) || !(c.coreN > 0)) return c.fteAll;
+    return c.users / R + (c.fteAll - c.coreN);
   }
-  /* 配置比率 R のときの職員1人あたり給与費（額面 B）＝ 給与原資 ÷ 職員数(R)。 */
-  function bAtRatio(c, R){ var s = staffNAtRatio(c, R); return s > 0 ? c.pool / s : 0; }
+  /* 配置比率 R のときの 1人あたり給与費 A ＝ 人件費総額 ÷ 職員数(R)。 */
+  function aAtRatio(c, R){ var f = fteAllAtRatio(c, R); return f > 0 ? c.total / f : 0; }
 
-  /* staffNAtRatio の逆写像: 職員数 n（正規＋非正規）を与える配置比率 R。
-     n = a/R + b なので R = a/(n − b)。横軸を人数空間にした版（段階2追）で、
-     つまみ／ドラッグの目標人数 n を配置比率へ戻して核だけ按分するのに使う。 */
-  function ratioAtStaffN(c, n){
+  /* fteAllAtRatio の逆写像: 職員数 n（fteAll）を与える配置比率 R。
+     n = users/R + otherFte なので R = users/(n − otherFte)。つまみ／ドラッグの目標人数 n を
+     配置比率へ戻して核だけ按分するのに使う。 */
+  function ratioAtFteAll(c, n){
     if (!(c.coreN > 0)) return (c.svc.ratio && c.svc.ratio.std) ? c.svc.ratio.std : 1;
-    var a = c.coreStaff * c.users / c.coreN, b = c.staffN - c.coreStaff;
-    return ((n - b) > 0) ? a / (n - b) : Infinity;
+    var other = c.fteAll - c.coreN;
+    return ((n - other) > 0) ? c.users / (n - other) : Infinity;
   }
 
   return { W:W, SERVICES:SERVICES, buildStandard:buildStandard,
            calcState:calcState, initialRows:initialRows, scaleRows:scaleRows,
-           scaleCoreToRatio:scaleCoreToRatio, staffNAtRatio:staffNAtRatio, bAtRatio:bAtRatio,
-           ratioAtStaffN:ratioAtStaffN };
+           scaleCoreToRatio:scaleCoreToRatio, fteAllAtRatio:fteAllAtRatio, aAtRatio:aAtRatio,
+           ratioAtFteAll:ratioAtFteAll };
 })();
 /* ===== SWMD-ENGINE:END ===== */
 
 export default ENGINE;
 export const { SERVICES, buildStandard, calcState, initialRows, scaleRows,
-  scaleCoreToRatio, staffNAtRatio, bAtRatio, ratioAtStaffN } = ENGINE;
+  scaleCoreToRatio, fteAllAtRatio, aAtRatio, ratioAtFteAll } = ENGINE;

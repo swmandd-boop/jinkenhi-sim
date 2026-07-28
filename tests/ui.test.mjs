@@ -117,13 +117,13 @@ test("UI-07 スライダーは人数軸の割合へ合わせ、その他職員�
   const other0 = rowTriples(t)[2];                          // その他行（index2）の初期値
   const E = t.d.defaultView.ENGINE;
   const c0 = stateOf(t);
-  // v0.5段2追: つまみは人数空間の割合[0,1]。特養は基準3:1域＝職員数 staffN(4:1)..staffN(1:1)。
-  // つまみ0.5 → 目標職員数 = その中点。ドラッグ先の staffN がその中点に一致すること。
-  const nmin = E.staffNAtRatio(c0, 4), nmax = E.staffNAtRatio(c0, 1);
+  // v0.5: つまみは人数空間の割合[0,1]。職員数=fteAll（正規＋非正規＋派遣）。特養は基準3:1域。
+  // つまみ0.5 → 目標職員数 = fteAll(4:1)..fteAll(1:1) の中点。ドラッグ先の職員数がその中点に一致すること。
+  const nmin = E.fteAllAtRatio(c0, 4), nmax = E.fteAllAtRatio(c0, 1);
   slide(t, 0.5);
   const c = stateOf(t);
-  assert.ok(Math.abs(c.staffN - (nmin + 0.5 * (nmax - nmin))) < 1e-6,
-    `職員数が人数軸中点にならない: staffN=${c.staffN} 期待=${nmin + 0.5 * (nmax - nmin)}`);
+  assert.ok(Math.abs(c.n - (nmin + 0.5 * (nmax - nmin))) < 1e-6,
+    `職員数が人数軸中点にならない: n=${c.n} 期待=${nmin + 0.5 * (nmax - nmin)}`);
   assert.ok(c.ratioActual > 1 && c.ratioActual < 4, `配置比率が域外: ${c.ratioActual}`);
   // その他職員（index2）は配置比率ドラッグで動かない
   const other1 = rowTriples(t)[2];
@@ -211,7 +211,7 @@ test("UI-11 スライダーのつまみは確定後も現在の職員数を反�
   const k1 = knob(), r1 = ratio();
   assert.ok(k1 > 0.5, `確定後につまみが左（薄い側）へ戻っている: knob=${k1}`);
   assert.ok(Math.abs(k1 - 0.7) < 0.01, `つまみが操作値0.7を反映していない: ${k1}`);
-  t.set("bonus", 4.5);                      // STEP以外の入力を触って再描画
+  t.set("fuku", 17);                        // STEP以外の入力を触って再描画（配置比率・職員数に影響しない）
   assert.ok(Math.abs(knob() - k1) < 0.01, `再描画でつまみが動いた: ${knob()} 期待${k1}`);
   assert.ok(Math.abs(ratio() - r1) < 1e-9, `再描画で配置比率が変わった: ${ratio()} 期待${r1}`);
   t.set("atgt", 500);
@@ -247,7 +247,7 @@ test("AXIS-01 横軸は人数に比例する（配置比率には比例しない
   const xr = (R) => { const el = t.d.querySelector(`#chart [data-r="${R}"]`); return el ? parseFloat(el.getAttribute("x")) : null; };
   const x4 = xr(4), x3 = xr(3), x2 = xr(2);
   assert.ok(x4 != null && x3 != null && x2 != null, `目盛り 4/3/2:1 が描かれていない: ${x4},${x3},${x2}`);
-  const n = R => E.staffNAtRatio(c, R);
+  const n = R => E.fteAllAtRatio(c, R);
   const screenRatio = (x2 - x3) / (x3 - x4);
   const headRatio = (n(2) - n(3)) / (n(3) - n(4));
   assert.ok(Math.abs(screenRatio - headRatio) < 0.02, `画面距離比 ${screenRatio} ≠ 人数差比 ${headRatio}（人数比例でない）`);
@@ -360,4 +360,41 @@ test("UI-16 人件費を保つ側が基準3:1を割ると朱色警告、満た�
   assert.ok(!t2.txt("#trend").includes("を割ります"), `基準を満たすのに警告が出ている: ${t2.txt("#trend")}`);
   assert.ok(!t2.d.querySelector("#trend .dwarn"), `満たすのに.dwarnがある`);
   assert.ok(!t2.d.querySelector("#trend .warn-badge"), `満たすのに.warn-badgeがある`);
+});
+
+/* v0.5 A統一: 画面上で「職員数」を名乗る表示はすべて同じ値（fteAll＝正規＋非正規＋派遣）を指す。
+   派遣を入れて staffN と fteAll がずれる構成でも、バー／footer／グラフ点／雇用区分／両面カードが一致する。 */
+test("UI-17 画面の「職員数」を名乗る表示はすべて同一（fteAll）", () => {
+  const t = open();
+  const f1 = v => (Math.round(v * 10) / 10).toFixed(1);
+  t.row(0, "haken", 4); t.row(1, "n", 5); t.set("g", 2.5);   // 派遣を入れ fteAll≠正規非正規に
+  const c = stateOf(t), N = c.n;                              // 画面の職員数＝fteAll
+  assert.ok(Math.abs(N - (c.nSe + c.nHi + c.nHk)) < 1e-9, `fteAll≠正規+非正規+派遣`);
+  assert.ok(Math.abs(parseFloat(t.d.getElementById("o-n").textContent) - N) < 0.05, `スライダーの職員数合計 o-n=${t.d.getElementById("o-n").textContent} ≠ ${f1(N)}`);
+  assert.ok(Math.abs(parseFloat(t.d.getElementById("f-n").textContent) - N) < 0.05, `職種表 footer 合計 f-n ≠ ${f1(N)}`);
+  const pointLabel = [...t.d.querySelectorAll("#chart text")].map(e => e.textContent).find(s => s.includes("万円") && s.includes("人") && s.includes("／"));
+  assert.ok(pointLabel && pointLabel.includes(f1(N) + "人"), `グラフの点の人数が fteAll でない: ${pointLabel}`);
+  assert.ok(Math.abs(c.proj.dilemma.keepRatio.nNow - N) < 1e-9, `両面カードの現在職員数 ≠ fteAll`);
+  assert.ok(t.txt("#trend").includes(f1(N) + " 人"), `両面カードに現在職員数 ${f1(N)} 人 が出ていない`);
+});
+
+/* v0.5 A統一: 賃金下限の線は、額面入力を事業主負担込み（×(1+法定福利費率)）に換算した位置に引く。
+   額面そのものの位置ではないこと、ラベルに両方併記されることを実DOMで確認する。 */
+test("UI-18 賃金下限の線は 額面×(1+法定福利費率) の位置（ラベル併記）", () => {
+  const t = open();
+  t.set("atgt", 440);
+  const c = stateOf(t);
+  const svg = t.d.getElementById("chart");
+  const pt = svg.querySelector('[data-o="point"]'), wline = svg.querySelector('[data-o="wage"]');
+  assert.ok(pt && wline, `点または賃金下限の線がない`);
+  const yBottom = 20 + (400 - 20 - 54);                       // VB.t + PH ＝ Y(0)
+  const cy = parseFloat(pt.getAttribute("cy"));
+  const valueAt = y => (yBottom - y) * c.A / (yBottom - cy);  // Y の逆写像（線形）
+  const lineVal = valueAt(parseFloat(wline.getAttribute("y1")));
+  const floorA = 440 * (1 + c.fuku / 100);
+  assert.ok(Math.abs(lineVal - floorA) < 1.5, `賃金下限の線が floorA(${floorA.toFixed(1)}) の位置にない: ${lineVal.toFixed(1)}`);
+  assert.ok(Math.abs(lineVal - 440) > 10, `賃金下限の線が額面440の位置にある（換算されていない）: ${lineVal.toFixed(1)}`);
+  const wlabel = [...svg.querySelectorAll("text")].map(e => e.textContent).find(s => s.includes("賃金下限"));
+  assert.ok(wlabel && wlabel.includes("440") && wlabel.includes("事業主負担込み") && wlabel.includes(f1floor(floorA)), `ラベルに額面と事業主負担込みの併記がない: ${wlabel}`);
+  function f1floor(v){ return (Math.round(v * 10) / 10).toLocaleString("ja-JP", { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
 });

@@ -43,12 +43,17 @@ test("INV-03 配置比率の分母に非正規が含まれる", () => {
   }
 });
 
-/* ---- 不変条件4: 合計常勤換算 × 平均年収 ＝ 給与原資（曲線の定義） ---- */
-test("INV-04 人数 × 平均年収 = 給与原資", () => {
+/* ---- 不変条件4（v0.5 A統一）: 職員数 × 1人あたり給与費 ＝ 人件費総額（曲線の定義） ----
+   指標を A（＝人件費総額÷職員数・派遣込み・事業主負担込み）に一本化。職員数＝fteAll。 */
+test("INV-04 職員数 × 1人あたり給与費 = 人件費総額", () => {
   for (const s of ALL) {
     for (const scale of [0.5, 1, 1.7]) {
-      const c = run(s, { scale });
-      assert.ok(near(c.n * c.avg, c.pool, 1e-9), `${s} scale=${scale}`);
+      for (const hakenFee of [0, 1500]) {
+        const c = run(s, { scale, hakenFee });
+        assert.ok(near(c.n, c.fteAll, 1e-12), `${s}: 画面の職員数 n=${c.n} ≠ fteAll=${c.fteAll}`);
+        assert.ok(near(c.avg, c.A, 1e-12), `${s}: avg=${c.avg} ≠ A=${c.A}`);
+        assert.ok(near(c.n * c.avg, c.total, 1e-9), `${s} scale=${scale} 派遣費=${hakenFee}: n×A=${c.n*c.avg} ≠ 総額=${c.total}`);
+      }
     }
   }
 });
@@ -123,7 +128,8 @@ test("INV-12 成立判定と下限・上限の関係が整合する", () => {
     for (const atgt of [200, 400, 700, 1200]) {
       const c = run(s, { atgt });
       assert.equal(c.feasible, c.nmin <= c.nCap + 1e-9, `${s} atgt=${atgt}`);
-      assert.equal(c.okA, c.avg >= atgt - 1e-9, `${s} atgt=${atgt}`);
+      // v0.5 A統一: 賃金下限は額面 atgt を事業主負担込み floorA に換算して A と比較する
+      assert.equal(c.okA, c.avg >= c.floorA - 1e-9, `${s} atgt=${atgt}`);
     }
   }
 });
@@ -186,38 +192,39 @@ test("RKN-01 老健の管理栄養士は実利用者数でなく入所定員で�
 
 /* ==== v0.5 段階1（入力構造）で追加する不変条件 ==== */
 
-/* ---- INV-22 分子と分母の整合（§2・§4）----
-   A（1人あたり給与費）は分子=人件費総額・分母=正規＋非正規＋派遣。
-   B（職員1人あたり給与費）は分子=職員給与原資・分母=正規＋非正規（派遣を除く）。
-   派遣がある構成で、A と B の分母・分子がそれぞれ揃っていることを検算する。 */
-test("INV-22 A/B の分子と分母が揃っている（派遣ありでも）", () => {
+/* ---- INV-22 分子と分母の整合（§4・v0.5 A統一）----
+   指標を A に一本化。A（1人あたり給与費）は分子=人件費総額・分母=正規＋非正規＋派遣（＝職員数 fteAll）。
+   分子に派遣費が入るので分母にも派遣を含める。派遣人数を入れても A×職員数=総額 が成立する。 */
+test("INV-22 A の分子と分母が揃っている（派遣ありでも）", () => {
   for (const s of ALL) {
     for (const hakenFee of [0, 800, 2400]) {
-      // 派遣の人数を各行に入れて分母を動かす
       let I = makeInput(s, { hakenFee });
-      I.rows = I.rows.map(r => ({ ...r, haken: (r.haken || 0) + 1 }));
+      I.rows = I.rows.map(r => ({ ...r, haken: (r.haken || 0) + 1 }));   // 派遣人数を各行に入れて分母を動かす
       const c = calcState(I);
-      const staffN = c.nSe + c.nHi;             // 正規＋非正規
-      const allN = staffN + c.nHk;              // ＋派遣
+      const allN = c.nSe + c.nHi + c.nHk;       // 正規＋非正規＋派遣
+      assert.ok(near(c.fteAll, allN, 1e-9), `${s}: fteAll=${c.fteAll} ≠ 正規+非正規+派遣=${allN}`);
       assert.ok(near(c.A, allN > 0 ? c.total / allN : 0, 1e-9),
         `${s} 派遣費=${hakenFee}: A=${c.A} ≠ total/(正規+非正規+派遣)=${c.total/allN}`);
-      assert.ok(near(c.B, staffN > 0 ? c.pool / staffN : 0, 1e-9),
-        `${s} 派遣費=${hakenFee}: B=${c.B} ≠ pool/(正規+非正規)=${c.pool/staffN}`);
+      assert.ok(near(c.A * c.fteAll, c.total, 1e-6), `${s}: A×職員数=${c.A*c.fteAll} ≠ 総額=${c.total}`);
     }
   }
 });
 
-/* ---- INV-23 派遣0のとき A ÷ B ＝ 1 + 法定福利費率（§4）----
-   AとBは基準が違う（A=総額÷全員／B=原資÷職員）。派遣が0なら分母は一致し、
-   分子の差は事業主負担だけになるので比は常に 1+法定福利費率 になる（一致はしない）。 */
-test("INV-23 派遣0のとき A÷B = 1+法定福利費率", () => {
+/* ---- INV-23 派遣0でも派遣ありの式がそのまま成立する（場合分けなし・v0.5 A統一）----
+   A＝total/(正規＋非正規＋派遣)、fteAll＝正規＋非正規＋派遣。派遣0では派遣項が消え、
+   自動的に正規＋非正規になる。分岐（if 派遣）なしで同じ式が成立することを固定する。 */
+test("INV-23 派遣0でも派遣ありの式が分岐なしで成立する", () => {
   for (const s of ALL) {
-    for (const fuku of [0, 16.5, 19]) {
-      const c = calcState(makeInput(s, { fuku, hakenFee: 0 }));
-      assert.ok(c.nHk === 0, `${s}: 既定で派遣人数は0のはず（nHk=${c.nHk}）`);
-      assert.ok(near(c.A / c.B, 1 + fuku / 100, 1e-9),
-        `${s} fuku=${fuku}: A/B=${c.A/c.B} ≠ 1+法定福利費率=${1+fuku/100}`);
-    }
+    const c0 = calcState(makeInput(s, { hakenFee: 0 }));            // 派遣なし
+    assert.ok(c0.nHk === 0, `${s}: 既定で派遣人数は0`);
+    assert.ok(near(c0.fteAll, c0.nSe + c0.nHi, 1e-12), `${s}: 派遣0で fteAll=正規+非正規`);
+    assert.ok(near(c0.A, c0.fteAll > 0 ? c0.total / c0.fteAll : 0, 1e-12), `${s}: 派遣0でも A=total/職員数`);
+    assert.ok(near(c0.A * c0.fteAll, c0.total, 1e-6) && Number.isFinite(c0.A), `${s}: 派遣0で NaN/分岐なく成立`);
+    // 派遣を足した構成でも同じ式（total/fteAll）で NaN なく成立
+    let I = makeInput(s, { hakenFee: 1200 });
+    I.rows = I.rows.map(r => ({ ...r, haken: (r.haken || 0) + 2 }));
+    const c1 = calcState(I);
+    assert.ok(near(c1.A * c1.fteAll, c1.total, 1e-6) && Number.isFinite(c1.A), `${s}: 派遣ありでも同式で成立`);
   }
 });
 
@@ -362,17 +369,17 @@ test("INV-20 推移の吸収（人員減・収入増）が同じ増分を指す"
 
 /* ==== v0.5「同じジレンマの両面」（5年後・段階3の代替） ==== */
 
-/* ---- DIL-01 率を保つ側の n(t)=n(0)/(1+g)^t、かつ等原資（n×給与費が原資と一定）----
-   賃金が年率 g で上がるとき、原資を保つと職員数は (1+g)^t で割った点まで減る。
-   n(t)×給与費(t)=n(0)×B(0)=給与原資 が成り立つ（等原資曲線上の点）。 */
-test("DIL-01 率を保つ側: n(5)=n(0)/(1+g)^5 かつ 等原資", () => {
+/* ---- DIL-01 人件費を保つ側の n(t)=n(0)/(1+g)^t、かつ等・人件費総額（n×A が総額と一定）----
+   賃金が年率 g で上がるとき、人件費総額を保つと職員数は (1+g)^t で割った点まで減る。
+   n(t)×A(t)=n(0)×A(0)=人件費総額 が成り立つ（等・人件費総額の曲線上の点）。v0.5 A統一。 */
+test("DIL-01 人件費を保つ側: n(5)=n(0)/(1+g)^5 かつ 等・人件費総額", () => {
   for (const s of ALL) {
     for (const g of [1.5, 2.5, 5]) {
       const c = calcState(makeInput(s, { g }));
       const f = Math.pow(1 + g / 100, 5), d = c.proj.dilemma;
-      assert.ok(near(d.keepRatio.n5, c.staffN / f, 1e-9), `${s} g=${g}: n5=${d.keepRatio.n5} ≠ staffN/(1+g)^5=${c.staffN / f}`);
-      const wage5 = c.B * f;                                   // 職員1人あたり給与費(5)
-      assert.ok(near(d.keepRatio.n5 * wage5, c.pool, 1e-6), `${s} g=${g}: n5×給与費(5)=${d.keepRatio.n5 * wage5} ≠ 原資=${c.pool}`);
+      assert.ok(near(d.keepRatio.n5, c.n / f, 1e-9), `${s} g=${g}: n5=${d.keepRatio.n5} ≠ 職員数/(1+g)^5=${c.n / f}`);
+      const a5 = c.A * f;                                   // 1人あたり給与費(5)
+      assert.ok(near(d.keepRatio.n5 * a5, c.total, 1e-6), `${s} g=${g}: n5×A(5)=${d.keepRatio.n5 * a5} ≠ 人件費総額=${c.total}`);
     }
   }
 });
@@ -386,7 +393,7 @@ test("DIL-02 両面の値が定義どおり（人数を保つ側=推移表と一
       const f = Math.pow(1 + g / 100, 5), d = c.proj.dilemma;
       assert.ok(near(d.keepStaff.ratio, c.effRatio * f), `${s} g=${g}: 率(5)`);
       assert.ok(near(d.keepStaff.deltaTotal, c.total * (f - 1)), `${s} g=${g}: 人件費増分`);
-      const core5 = d.keepRatio.n5 - c.otherStaff;
+      const core5 = d.keepRatio.n5 - c.otherFte;
       if (core5 > 0 && c.users > 0) assert.ok(near(d.keepRatio.ratio5, c.users / core5, 1e-9),
         `${s} g=${g}: 配置比率(5)=${d.keepRatio.ratio5} ≠ users/(n5−その他)=${c.users / core5}`);
     }
@@ -412,8 +419,8 @@ test("DIL-04 人件費を保つ側の配置比率(t) と 基準割れ年", () =>
   for (const s of ALL) {
     for (const g of [1, 3, 5]) {
       const c = calcState(makeInput(s, { g })), d = c.proj.dilemma.keepRatio;
-      const rAt = t => { const nt = c.staffN / Math.pow(1 + g / 100, t); const core = nt - c.otherStaff; return core > 0 ? c.users / core : 0; };
-      if (c.staffN / Math.pow(1 + g / 100, 3) - c.otherStaff > 0)
+      const rAt = t => { const nt = c.n / Math.pow(1 + g / 100, t); const core = nt - c.otherFte; return core > 0 ? c.users / core : 0; };
+      if (c.n / Math.pow(1 + g / 100, 3) - c.otherFte > 0)
         assert.ok(near(d.ratio3, rAt(3), 1e-9), `${s} g=${g}: ratio3=${d.ratio3} ≠ ${rAt(3)}`);
       assert.ok(near(d.ratio5, rAt(5), 1e-9), `${s} g=${g}: ratio5=${d.ratio5} ≠ ${rAt(5)}`);
       const std = c.svc.ratio && c.svc.ratio.std;

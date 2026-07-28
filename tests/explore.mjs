@@ -49,12 +49,12 @@ function randomInput() {
 }
 
 const CHECKS = [
-  ["合計が正規＋非正規と一致", (c) => near(c.baseS + c.baseH, c.baseN) && near(c.nSe + c.nHi, c.n)],
+  ["職員数＝正規＋非正規＋派遣（fteAll）", (c) => near(c.baseS + c.baseH, c.baseN) && near(c.nSe + c.nHi + c.nHk, c.n)],
   ["数値にNaNがない", (c) => Object.values(c).every(v => typeof v !== "number" || !Number.isNaN(v))
       && c.rows.every(r => !Number.isNaN(r.totalFte))
       && c.proj.horizons.every(x => Number.isFinite(x.ratio) && Number.isFinite(x.delta))
       && ["delta","revUp","rate","cutN"].every(k => Number.isFinite(c.proj.absorb[k]))],
-  ["職員数×職員1人あたり給与費＝給与原資", (c) => near(c.n * c.avg, c.pool, 1e-8)],
+  ["職員数×1人あたり給与費＝人件費総額", (c) => near(c.n * c.avg, c.total, 1e-6)],
   ["給与原資×(1+負担率)＋派遣費＝人件費総額", (c, I) => near(c.pool * (1 + I.fuku / 100) + c.hakenFee, c.total, 1e-6)],
   ["未達なしなら全職種で基準以上", (c) => c.shorts.length > 0 || c.blocked
       || c.rows.every(r => !(r.std > 0) || r.totalFte >= r.std - 1e-9)],
@@ -63,7 +63,7 @@ const CHECKS = [
   ["配置比率の分母は正規＋非正規", (c) => !c.svc.ratio || near(c.coreN,
       c.rows.filter(r => c.svc.ratio.roles.includes(r.key)).reduce((a, r) => a + r.totalFte, 0))],
   ["A の分母は正規＋非正規＋派遣", (c) => near(c.A, c.fteAll > 0 ? c.total / c.fteAll : 0, 1e-8)],
-  ["B の分母は正規＋非正規（派遣を除く）", (c) => near(c.B, c.staffN > 0 ? c.pool / c.staffN : 0, 1e-8)],
+  ["賃金下限は額面×(1+法定福利費率)", (c, I) => near(c.floorA, I.atgt * (1 + I.fuku / 100), 1e-9)],
   ["構成考慮の下限≧基準の単純合計", (c) => !isFinite(c.nMinComp) || c.nMinComp >= c.stdN - 1e-9],
   ["成立判定が下限と上限に整合", (c) => c.feasible === (c.nmin <= c.nCap + 1e-9)],
   ["スケールで給与原資が変わらない", (c, I) => near(calcState({ ...I, scale: I.scale * 1.37 }).pool, c.pool)],
@@ -72,7 +72,7 @@ const CHECKS = [
       const d = calcState({ ...I, rows });
       return near(d.pool, c.pool) && near(d.total, c.total) && near(d.n, c.n); }],
   ["不足を埋めると未達が解消", (c, I) => calcState(fillStd(I)).shorts.length === 0 || !!c.blocked],
-  ["派遣0なら A÷B＝1+負担率", (c, I) => c.nHk > 0 || c.B <= 0 || near(c.A / c.B, 1 + I.fuku / 100, 1e-8)]
+  ["賃金の余裕 ＝ A ÷ 賃金下限(事業主負担込み)", (c, I) => !(I.atgt > 0) || near(c.slackWage, c.A / c.floorA, 1e-9)]
 ];
 
 let fails = 0;

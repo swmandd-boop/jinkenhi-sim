@@ -165,10 +165,6 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
         <label for="fuku">法定福利費・退職共済等の事業主負担率</label>
         <div class="inline"><input type="number" id="fuku" value="16.5" step="0.1" min="0"><span class="unit">％</span></div>
       </div>
-      <div class="field">
-        <label for="bonus">賞与月数（月例給の換算用）</label>
-        <div class="inline"><input type="number" id="bonus" value="4.0" step="0.1" min="0"><span class="unit">ヶ月</span></div>
-      </div>
       <div class="readout">
         <div class="row"><span class="k">職員給与原資（賞与含む・派遣除く）</span><span class="v" id="o-wagepool">–</span></div>
         <div class="row"><span class="k">派遣費用（割り戻しなし）</span><span class="v" id="o-hakenfee">–</span></div>
@@ -213,7 +209,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
   <div>
     <section class="chartbox">
       <h2>配置比率と賃金のトレードオフ</h2>
-      <p class="chartnote">横軸は職員数（常勤換算）で、対応する配置比率（介護・看護 対 入所者）を上段に併記します。曲線は給与原資÷職員数の双曲線。琥珀色の点を左右にドラッグすると介護・看護の人数だけが動き（その他職員は固定）、手厚くするほど職員1人あたり給与費が下がります。左（薄い側）が基準割れです。</p>
+      <p class="chartnote">横軸は職員数（常勤換算・正規＋非正規＋派遣）で、対応する配置比率（介護・看護 対 入所者）を上段に併記します。曲線は人件費総額÷職員数の双曲線（＝1人あたり給与費）。琥珀色の点を左右にドラッグすると介護・看護の人数だけが動き（その他職員は固定）、手厚くするほど1人あたり給与費が下がります。左（薄い側）が基準割れです。賃金下限は額面入力を事業主負担込み（×(1+法定福利費率)）に換算した位置に引きます。</p>
       <svg id="chart" viewBox="0 0 640 400" role="img" aria-label="配置比率と職員1人あたり給与費のトレードオフ曲線"></svg>
       <div class="legend">
         <span><i style="border-color:var(--take)"></i>基準内かつ賃金下限を満たす区間</span>
@@ -247,7 +243,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
       <h2>職種別の内訳<span class="tag">STEP 5</span></h2>
       <p class="hint" style="margin:-6px 0 10px"><b>正規・非正規は、それぞれの常勤換算をそのまま入れてください</b>（内数ではありません）。合計が「基準」以上かどうかで職種別に充足を判定します。<br>
       <b>兼務している職員は、常勤換算で按分して入力してください</b>（例：看護師0.8・機能訓練指導員0.2）。ツールは兼務の判定をしません。<br>
-      <span style="color:var(--ink-2)">平均年収の出し方・金額の範囲（額面かどうか等）は、ページ下部の「前提と出典の扱い」に載せています。</span></p>
+      <span style="color:var(--ink-2)">1人あたり給与費（A）の出し方・金額の範囲（事業主負担込み・派遣込み等）は、ページ下部の「前提と出典の扱い」に載せています。</span></p>
       <div class="tbl-scroll">
       <table id="tbl">
         <thead>
@@ -320,26 +316,27 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
         <li>実配置の初期値は<b>運営基準どおりの人数</b>を入れています。3:1などの基準を満たす最小構成で、休憩・夜勤・有給・欠員は織り込んでいません。実際に何人置くかは施設の配置の考え方によるため、そこから先は入力していただく設計です。</li>
         <li>基準のない職種（事務職員・調理員など）は0人から始まります。給食委託であれば調理員は0のままで構いませんが、事務職員は実数を入れないと賃金水準が実態より高く出ます。</li>
         <li>正規・非正規は内数ではなく、それぞれの常勤換算を直接入れます。配置基準の充足は雇用形態を問わず合計で判定します。</li>
-        <li>正規と非正規は<b>人数だけ</b>を分け、金額（給与費）は分けません（v0.5で非正規の賃金水準係数70％は廃止）。職員1人あたり給与費は 給与原資÷（正規＋非正規）の割り算で、正規・非正規を同額に扱います。個人・職種ごとの水準差は、この平均の内側で法人が配分します。</li>
-        <li>非正規の事業主負担率は<b>正規と同率として計算しています。</b>社会保険の加入対象外の短時間勤務が多い場合、実際の負担は雇用保険・労災だけになり大きく下がります。その差はこのツールでは反映していません。</li>
-        <li>このツールは非正規比率を「原資を増やさずに人数を増やす手段」として扱いますが、定着率・育成コスト・サービスの質は計算していません。比率の判断材料としては不足しています。</li>
+        <li>正規と非正規は<b>人数だけ</b>を分け、金額（給与費）は分けません（v0.5で非正規の賃金水準係数70％は廃止）。個人・職種ごとの水準差は法人が配分します。</li>
+        <li>事業主負担率は<b>全職員一律で計算しています。</b>社会保険の加入対象外の短時間勤務が多い場合、実際の負担は雇用保険・労災だけになり大きく下がります。その差はこのツールでは反映していません。</li>
+        <li>このツールは非正規比率を「人件費を増やさずに人数を増やす手段」として扱いますが、定着率・育成コスト・サービスの質は計算していません。比率の判断材料としては不足しています。</li>
       </ul>
-      <h4>平均年収は職種差を入れていません</h4>
+      <h4>1人あたり給与費（A）は職種差を入れていません</h4>
       <ul>
-        <li>平均年収は<b>給与原資 ÷ 人数</b>です。職種ごとの賃金差は入力しません。総額は職種間の配分に依らないため、このツールの主題（人数と賃金水準のトレードオフ）には効かないからです。</li>
-        <li>正規と非正規は<b>人数で分けますが、金額は分けません</b>（賃金水準係数は廃止）。職員1人あたり給与費（額面）＝<b>給与原資 ÷（正規＋非正規）</b>。派遣は分子・分母とも別で、<b>派遣1人あたり費用＝派遣職員費 ÷ 派遣人数</b>として別に示します。</li>
+        <li>1人あたり給与費は<b>人件費総額 ÷ 職員数（正規＋非正規＋派遣）</b>で、<b>事業主負担込み</b>の1指標に一本化しています（v0.5）。分子に派遣職員費・法定福利費が入るので、分母にも派遣を含めて揃えています。職種ごとの賃金差は入力しません（総額は職種間の配分に依らないため）。</li>
+        <li>派遣は分子・分母とも職員数に含めますが、<b>派遣1人あたり費用＝派遣職員費 ÷ 派遣人数</b>を別に示します（賃金ではなく委託費用）。自前より高いか安いかの判断材料になります。</li>
+        <li>賃金下限は<b>額面（求人票と同じ土俵）</b>で入力し、グラフでは A に合わせて<b>×(1+法定福利費率)</b>した位置に線を引きます（ラベルに両方を併記）。</li>
       </ul>
       <h4>金額がどの範囲を指しているか</h4>
       <ul>
-        <li>「人件費総額」は決算書の給与費と同じ範囲で、<b>事業主負担の法定福利費を含みます</b>。そこから事業主負担率で割り戻したものが「給与原資」で、年収・月例給はこの額面ベースです。</li>
+        <li><b>1人あたり給与費（A）＝人件費総額 ÷ 職員数（正規＋非正規＋派遣）</b>です。分子に事業主負担の法定福利費と派遣職員費を含むため、分母にも派遣を入れて揃えています（v0.5で指標をAに一本化）。</li>
         <li>既定の16.5％は健康保険・厚生年金・雇用保険・労災の<b>事業主負担分のおおよその合計</b>です。<b>退職共済掛金や退職給付引当は含んでいません。</b>決算書の人件費から逆算すると18〜19％程度になることが多く、その場合は実額に置き換えてください（この数値も未検証）。</li>
-        <li>決算書の人件費には<b>役員報酬・退職給付費用・通勤手当</b>も入っています。職種表にこれらの行がないと、その分が既存職種に上乗せされ、平均年収が実態より高く出ます。金額が大きい場合は行を追加してください。</li>
-        <li>「月例給」は年収を（12＋賞与月数）で割った単純な換算値です。実際の月例給には夜勤手当・時間外・通勤手当が含まれるため、求人票の基本給とは一致しません。</li>
+        <li>決算書の人件費には<b>役員報酬・退職給付費用・通勤手当</b>も入っています。職種表にこれらの行がないと、その分が既存職種に上乗せされ、1人あたり給与費が実態より高く出ます。金額が大きい場合は行を追加してください。</li>
+        <li><b>賃金下限は額面（求人票と同じ土俵）で入力します。</b>グラフ上では、A が事業主負担込みのため、賃金下限を<b>×(1+法定福利費率)</b>した位置に線を引き、ラベルに額面と事業主負担込みの両方を併記します（例：440万円 → 512.6万円）。</li>
       </ul>
       <h4>数値の検証状況</h4>
       <ul>
         <li>人件費率の参考値は、厚生労働省「令和7年度介護事業経営概況調査」（令和6年度決算）の収入に対する給与費割合のうち<b>全サービス平均64.3％</b>です。<b>収載している4サービスについては、サービス別の実数を未取得のため全サービス平均を暫定適用しています。</b></li>
-        <li>法定福利費率16.5％と賞与月数は<b>説明用のサンプル値（未検証）</b>です。実データでの較正は行っていません。自法人の実額に置き換えてお使いください。（非正規の賃金水準係数70％は v0.5 で廃止したため、未検証のサンプルから外れました。）</li>
+        <li>法定福利費率16.5％は<b>説明用のサンプル値（未検証）</b>です。実データでの較正は行っていません。自法人の実額に置き換えてお使いください。（非正規の賃金水準係数70％は v0.5 で廃止したため、未検証のサンプルから外れました。）</li>
         <li>賃金は年収ベースで、退職給付引当・通勤費・派遣委託費・人材紹介手数料は含めていません。</li>
       </ul>
     </div>
@@ -347,7 +344,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
 </div>
 
 <footer class="site-footer">
-  <p class="disclaim">本ツールは福祉施設の人件費配分を検討するための参考シミュレーションです。初期値には未検証のサンプル値（収益・人件費総額・法定福利費率・賞与月数など）を含みます。配置基準の記載は主要職種の一般的な基準の要約で、加算要件・自治体の上乗せ条例・兼務・みなし配置・経過措置は反映しておらず、<b>指定権者の解釈を代替するものではありません</b>。本ツールは経営判断のための材料を示すもので、<b>判断そのものを行うものではありません</b>。実際の配置・賃金・収支は、決算書の実額と所轄庁の指導に基づいてご判断ください。</p>
+  <p class="disclaim">本ツールは福祉施設の人件費配分を検討するための参考シミュレーションです。初期値には未検証のサンプル値（収益・人件費総額・法定福利費率など）を含みます。配置基準の記載は主要職種の一般的な基準の要約で、加算要件・自治体の上乗せ条例・兼務・みなし配置・経過措置は反映しておらず、<b>指定権者の解釈を代替するものではありません</b>。本ツールは経営判断のための材料を示すもので、<b>判断そのものを行うものではありません</b>。実際の配置・賃金・収支は、決算書の実額と所轄庁の指導に基づいてご判断ください。</p>
   <p class="contact"><a href="https://forms.gle/nZd22V4geA5LAGVB8" target="_blank" rel="noopener">コンサルティング・研修のご相談・お申し込み</a></p>
   <p class="org">© 株式会社福祉マネジメント＆デザイン　人件費トレードオフ・シミュレーター v0.5</p>
 </footer>
@@ -486,7 +483,7 @@ var SERVICES = {
   /* 入力 I（DOM非依存）から、画面に出す全数値を計算して返す。
      収益 rev・人件費総額 total はともに決算書からの実額入力。人件費率は total/rev で出力する。
      hakenFee は total の内数（派遣職員費）。職員給与原資 = (total − hakenFee)/(1+fuku)。
-     I = { service, sizes, week, rev, total, hakenFee, fuku, bonus,
+     I = { service, sizes, week, rev, total, hakenFee, fuku,
            scale, nminAuto, nminManual, atgt, g, rows:[{key,name,note,n,hi,haken}] } */
   function calcState(I){
     var svc = SERVICES[I.service];
@@ -525,15 +522,14 @@ var SERVICES = {
     });
     var staffBase = baseS + baseH, fteBase = staffBase + baseK;
     var nSe = baseS * scale, nHi = baseH * scale, nHk = baseK * scale;
-    var staffN = staffBase * scale;   // 職員数（正規＋非正規）
-    var fteAll = fteBase * scale;      // 常勤換算合計（派遣込み・配置基準に使う）
-    var n = staffN, pool = staffPool;  // グラフ・成立判定の人数と原資は「職員」（段階2で配置比率軸へ）
-    var A = fteAll > 0 ? total / fteAll : 0;                          // 1人あたり給与費（派遣込み・事業主負担込み）
-    var B = staffN > 0 ? staffPool / staffN : 0;                      // 職員1人あたり給与費（額面）
-    var avg = B;                                                     // 既存 chart/verdict 等の「平均年収」＝ B
-    var hakenUnit = nHk > 0 ? hakenFee / nHk : 0;                     // 派遣1人あたり費用
-    var staffUnitCost = staffN > 0 ? (total - hakenFee) / staffN : 0; // 職員1人あたり人件費（事業主負担込み）
-    var regRatio = staffN > 0 ? nSe / staffN * 100 : 0;              // 正規比率（正規÷職員）
+    var staffN = staffBase * scale;   // 正規＋非正規（正規比率の分母に使う内部量。画面の「職員数」ではない）
+    var fteAll = fteBase * scale;      // 職員数（正規＋非正規＋派遣）＝画面の「職員数」に一本化（v0.5: 指標をAへ）
+    var n = fteAll, pool = staffPool;  // 画面の職員数・グラフ横軸・各計算の人数はすべて fteAll に統一
+    var A = fteAll > 0 ? total / fteAll : 0;   // 1人あたり給与費 ＝ 人件費総額 ÷（正規＋非正規＋派遣）・事業主負担込み
+    var avg = A;                               // 画面の「1人あたり給与費」は A に一本化（額面Bは廃止）
+    var floorA = I.atgt * (1 + I.fuku / 100);  // 賃金下限（額面入力）を A軸（事業主負担込み）へ換算した位置
+    var hakenUnit = nHk > 0 ? hakenFee / nHk : 0;  // 派遣1人あたり費用（年収ではなく費用）
+    var regRatio = staffN > 0 ? nSe / staffN * 100 : 0;  // 正規比率（正規÷(正規＋非正規)）
 
     rows.forEach(function(r){
       r.totalFte  = (r.n + r.hi + r.haken) * scale;  // 配置は派遣込み
@@ -557,21 +553,21 @@ var SERVICES = {
     /* 配置比率（雇用形態を問わず合計で数える）。coreN は核職種（介護・看護）の常勤換算合計
        （派遣込み）。coreStaff は核の職員分（派遣を除く正規＋非正規）で、配置比率を動かしたとき
        Bの分母（職員数）がどう動くかを出すのに使う（§3/§4）。 */
-    var coreN = 0, coreStaff = 0;
+    var coreN = 0;
     if (svc.ratio) rows.forEach(function(r){
-      if (svc.ratio.roles.indexOf(r.key) >= 0){ coreN += r.totalFte; coreStaff += (r.n + r.hi) * scale; }
+      if (svc.ratio.roles.indexOf(r.key) >= 0){ coreN += r.totalFte; }
     });
-    var otherStaff = staffN - coreStaff;   // その他職員（配置比率ドラッグで固定される職員分）
+    var otherFte = fteAll - coreN;   // その他職員の常勤換算（派遣込み・配置比率ドラッグで固定）
     var ratioActual = (coreN > 0 && users > 0)
       ? (svc.ratio && svc.ratio.invert ? users / coreN : users / coreN) : 0;
     var ratioBad = !!(svc.ratio && svc.ratio.std && !svc.ratio.invert
                       && coreN > 0 && ratioActual > svc.ratio.std + 1e-9);
 
-    /* 成立判定 */
-    var nCap      = I.atgt > 0 ? pool / I.atgt : Infinity;
+    /* 成立判定。賃金下限は額面入力 atgt を A軸（事業主負担込み）に換算した floorA で判定する。
+       nCap＝賃金下限を守って雇える職員数(fteAll)の上限＝人件費総額 ÷ floorA（曲線 A=total/n が floorA を切る点）。 */
+    var nCap      = I.atgt > 0 ? total / floorA : Infinity;
     var feasible  = nmin <= nCap + 1e-9;
-    var needPool  = nmin * I.atgt;
-    var needTotal = needPool * (1 + I.fuku / 100);
+    var needTotal = nmin * floorA;   // 配置下限 × 賃金下限（事業主負担込み）＝守るのに要る人件費総額
     var effRatio  = rev > 0 ? total / rev * 100 : 0;
 
     /* 必要人件費率（新機能A）: 譲れない線（配置下限×下回れない平均年収）を守るのに
@@ -608,11 +604,11 @@ var SERVICES = {
        ・率を保つ ：n(5)=n(0)/(1+g)^5（等原資曲線上の点＝n×給与費が原資と一定）、
                     配置比率(5)=入所者数 ÷（n(5)−その他職員） */
     var fD = grow(5);
-    var n5 = (fD > 0) ? n / fD : n, core5 = n5 - otherStaff;
-    /* 人件費を保つ側は原資一定で賃金だけ上がり、職員（＝配置）が減る。配置比率が法令基準（3:1 等）を
+    var n5 = (fD > 0) ? n / fD : n, core5 = n5 - otherFte;
+    /* 人件費を保つ側は人件費総額一定で賃金だけ上がり、職員（＝配置）が減る。配置比率が法令基準（3:1 等）を
        割る年を出す。判定は svc.ratio.std がある場合のみ（法令基準に対してのみ・閾値は発明しない）。 */
     var stdR = (svc.ratio && svc.ratio.std) ? svc.ratio.std : null;
-    function ratioAtY(t){ var nt = n / grow(t), cr = nt - otherStaff; return (users > 0 && cr > 0) ? users / cr : 0; }
+    function ratioAtY(t){ var nt = n / grow(t), cr = nt - otherFte; return (users > 0 && cr > 0) ? users / cr : 0; }
     var r3 = ratioAtY(3), r5 = (users > 0 && core5 > 0) ? users / core5 : 0;
     var breachYear = null;
     if (stdR){ if (r3 > stdR + 1e-9) breachYear = 3; else if (r5 > stdR + 1e-9) breachYear = 5; }
@@ -627,14 +623,14 @@ var SERVICES = {
       }
     };
 
-    /* 限界トレードオフ（v0.5: 非正規の賃金水準係数を廃したため、金額を正規/非正規で分ける
-       トレードオフは削除。人数と原資の関係のみ残す） */
-    var up = 10, f1 = 1 + I.fuku / 100;
-    var needMoreTotal = n * up * f1;
+    /* 限界トレードオフ（v0.5: A に一本化。1人あたり給与費 A は事業主負担込みなので、A を10万上げる＝
+       人件費総額を 10×職員数 増やす。原資×(1+負担)の割り増しは不要）。 */
+    var up = 10;
+    var needMoreTotal = n * up;
     var marg = {
-      perPerson: n > 0 ? pool / n - pool / (n + 1) : 0,
+      perPerson: n > 0 ? total / n - total / (n + 1) : 0,   // 職員を1人増やすと A が何万下がるか
       needMoreTotal: needMoreTotal,
-      cutN: (avg + up) > 0 ? n - pool / (avg + up) : 0,
+      cutN: (avg + up) > 0 ? n - total / (avg + up) : 0,     // A を+10万するのを人員削減で賄うなら
       ptUp: rev > 0 ? needMoreTotal / rev * 100 : 0,
       revUp: effRatio > 0 ? needMoreTotal / (effRatio / 100) : 0
     };
@@ -642,20 +638,20 @@ var SERVICES = {
     return {
       service:I.service, svcName:svc.name, svc:svc, sizes:I.sizes, week:I.week,
       scale:scale,
-      fuku:I.fuku, bonus:I.bonus, atgt:I.atgt,
+      fuku:I.fuku, atgt:I.atgt,
       rev:rev, total:total, hakenFee:hakenFee, pool:pool, effRatio:effRatio, unitRev:unitRev,
       rows:rows, baseS:baseS, baseH:baseH, baseK:baseK, baseN:staffBase, stdN:stdN,
       n:n, nSe:nSe, nHi:nHi, nHk:nHk, staffN:staffN, fteAll:fteAll,
-      A:A, B:B, avg:avg,
-      hakenUnit:hakenUnit, staffUnitCost:staffUnitCost, regRatio:regRatio,
+      A:A, avg:avg, floorA:floorA,
+      hakenUnit:hakenUnit, regRatio:regRatio,
       sMin:sMin, nMinComp:nMinComp, shorts:shorts, blocked:blocked, nmin:nmin,
-      slackN: (isFinite(nMinComp) ? n - nMinComp : Infinity),  // 配置の余裕（人）
-      slackWage: (I.atgt > 0 ? avg / I.atgt : Infinity),        // 賃金の余裕（倍）
-      users:users, coreN:coreN, coreStaff:coreStaff, otherStaff:otherStaff,
+      slackN: (isFinite(nMinComp) ? n - nMinComp : Infinity),  // 配置の余裕（人・fteAll基準）
+      slackWage: (I.atgt > 0 ? avg / floorA : Infinity),        // 賃金の余裕（A ÷ 賃金下限(事業主負担込み)）
+      users:users, coreN:coreN, otherFte:otherFte,
       ratioActual:ratioActual, ratioBad:ratioBad,
       nCap:nCap, feasible:feasible,
-      okN: n >= nmin - 1e-9, okA: avg >= I.atgt - 1e-9,
-      needPool:needPool, needTotal:needTotal, gap: needTotal - total,
+      okN: n >= nmin - 1e-9, okA: avg >= floorA - 1e-9,
+      needTotal:needTotal, gap: needTotal - total,
       needRatio: needRatioV, needRev: needRevV,
       gapPt: gapPt, gapRev: gapRev, gapCutN: gapCutN,
       proj: proj, marg:marg
@@ -711,30 +707,29 @@ var SERVICES = {
     });
   }
 
-  /* 配置比率 R のときの職員数（正規＋非正規・派遣除く）。核を R へ按分すると核職員は
-     coreStaff×(users/R)/coreN 倍に動き、その他職員 otherStaff は固定なので
-     staffN(R) = coreStaff·users/coreN / R + otherStaff = a/R + b。派遣は職員数に含めない。 */
-  function staffNAtRatio(c, R){
-    if (!(R > 0) || !(c.coreN > 0)) return c.staffN;
-    var a = c.coreStaff * c.users / c.coreN, b = c.staffN - c.coreStaff;
-    return a / R + b;
+  /* 配置比率 R のときの職員数（正規＋非正規＋派遣＝fteAll）。coreN(R)=users/R で、その他職員の
+     常勤換算 otherFte（派遣込み）は核ドラッグで固定なので fteAll(R) = users/R + otherFte。
+     v0.5: 指標を A に一本化したため、職員数は派遣込み(fteAll)で数える。 */
+  function fteAllAtRatio(c, R){
+    if (!(R > 0) || !(c.coreN > 0)) return c.fteAll;
+    return c.users / R + (c.fteAll - c.coreN);
   }
-  /* 配置比率 R のときの職員1人あたり給与費（額面 B）＝ 給与原資 ÷ 職員数(R)。 */
-  function bAtRatio(c, R){ var s = staffNAtRatio(c, R); return s > 0 ? c.pool / s : 0; }
+  /* 配置比率 R のときの 1人あたり給与費 A ＝ 人件費総額 ÷ 職員数(R)。 */
+  function aAtRatio(c, R){ var f = fteAllAtRatio(c, R); return f > 0 ? c.total / f : 0; }
 
-  /* staffNAtRatio の逆写像: 職員数 n（正規＋非正規）を与える配置比率 R。
-     n = a/R + b なので R = a/(n − b)。横軸を人数空間にした版（段階2追）で、
-     つまみ／ドラッグの目標人数 n を配置比率へ戻して核だけ按分するのに使う。 */
-  function ratioAtStaffN(c, n){
+  /* fteAllAtRatio の逆写像: 職員数 n（fteAll）を与える配置比率 R。
+     n = users/R + otherFte なので R = users/(n − otherFte)。つまみ／ドラッグの目標人数 n を
+     配置比率へ戻して核だけ按分するのに使う。 */
+  function ratioAtFteAll(c, n){
     if (!(c.coreN > 0)) return (c.svc.ratio && c.svc.ratio.std) ? c.svc.ratio.std : 1;
-    var a = c.coreStaff * c.users / c.coreN, b = c.staffN - c.coreStaff;
-    return ((n - b) > 0) ? a / (n - b) : Infinity;
+    var other = c.fteAll - c.coreN;
+    return ((n - other) > 0) ? c.users / (n - other) : Infinity;
   }
 
   return { W:W, SERVICES:SERVICES, buildStandard:buildStandard,
            calcState:calcState, initialRows:initialRows, scaleRows:scaleRows,
-           scaleCoreToRatio:scaleCoreToRatio, staffNAtRatio:staffNAtRatio, bAtRatio:bAtRatio,
-           ratioAtStaffN:ratioAtStaffN };
+           scaleCoreToRatio:scaleCoreToRatio, fteAllAtRatio:fteAllAtRatio, aAtRatio:aAtRatio,
+           ratioAtFteAll:ratioAtFteAll };
 })();
 /* ===== SWMD-ENGINE:END ===== */
 
@@ -768,7 +763,7 @@ function readInputs(){
   return {
     service:svcKey, sizes:sizes, week:num("week"),
     rev:num("rev"), total:num("total"), hakenFee:num("haken-fee"),
-    fuku:num("fuku"), bonus:num("bonus"),
+    fuku:num("fuku"),
     scale:scale, nminAuto:!nminTouched, nminManual:num("nmin"), atgt:num("atgt"),
     g:num("g"),
     rows:rows
@@ -851,10 +846,11 @@ function renderEmp(c){
   h += '<div class="row"><span class="k">正規　常勤換算</span><span class="v">' + n1(c.nSe) + ' 人</span></div>';
   h += '<div class="row"><span class="k">非正規　常勤換算</span><span class="v">' + n1(c.nHi) + ' 人</span></div>';
   h += '<div class="row"><span class="k">派遣　常勤換算</span><span class="v">' + n1(c.nHk) + ' 人</span></div>';
-  h += '<div class="row lead" style="border-top:1px solid var(--rule);margin-top:8px;padding-top:8px"><span class="k">職員1人あたり給与費（額面）</span><span class="v">' +
-       (c.staffN > 0 ? n1(c.B) + ' 万・月例給 ' + yen(c.B*10000/(12+c.bonus)) : "–") + '</span></div>';
-  h += '<div class="row"><span class="k">派遣1人あたり費用</span><span class="v">' + (c.nHk > 0 ? n1(c.hakenUnit) + ' 万' : "–") + '</span></div>';
-  h += '<div class="row"><span class="k">職員1人あたり人件費（事業主負担込み）</span><span class="v">' + (c.staffN > 0 ? n1(c.staffUnitCost) + ' 万' : "–") + '</span></div>';
+  h += '<div class="row lead" style="border-top:1px solid var(--rule);margin-top:8px;padding-top:8px"><span class="k">1人あたり給与費</span><span class="v">' +
+       (c.fteAll > 0 ? n1(c.A) + ' 万' : "–") + '</span></div>';
+  h += '<div class="row"><span class="k" style="padding-left:1em;color:var(--ink-2)">人件費総額÷職員数（正規＋非正規＋派遣）・事業主負担込み</span><span class="v"></span></div>';
+  h += '<div class="row"><span class="k">派遣1人あたり<b>費用</b></span><span class="v">' + (c.nHk > 0 ? n1(c.hakenUnit) + ' 万' : "–") + '</span></div>';
+  h += '<div class="row"><span class="k" style="padding-left:1em;color:var(--ink-2)">派遣職員費÷派遣人数（賃金ではなく委託費用）</span><span class="v"></span></div>';
   $("emp-readout").innerHTML = h;
 }
 
@@ -862,10 +858,8 @@ function renderRatio(c){
   var r = c.svc.ratio, cells = "";
   var avgNote = (isFinite(c.nMinComp) && Math.abs(c.slackN) < 0.5)
     ? '<span class="samp">基準最小配置での参考値</span>' : '';
-  cells += '<div class="cell"><span class="k">職員1人あたり給与費（額面）</span><span class="v">'+n1(c.avg)+
-           '</span><span class="s">万円　月例給 '+yen(c.avg*10000/(12+c.bonus))+avgNote+'</span></div>';
-  cells += '<div class="cell"><span class="k">職員1人あたり人件費</span><span class="v">'+n1(c.staffUnitCost)+
-           '</span><span class="s">万円　事業主負担 '+c.fuku+'％ 込み</span></div>';
+  cells += '<div class="cell"><span class="k">1人あたり給与費</span><span class="v">'+n1(c.A)+
+           '</span><span class="s">万円　人件費総額÷（正規＋非正規＋派遣）・事業主負担込み'+avgNote+'</span></div>';
   cells += '<div class="cell"><span class="k">正規比率</span><span class="v">'+c.regRatio.toFixed(1)+
            ' ％</span><span class="s">職員ベース（非正規 '+n1(c.nHi)+'／派遣 '+n1(c.nHk)+' 人）</span></div>';
   if (r && c.coreN > 0 && c.users > 0){
@@ -919,25 +913,25 @@ function renderVerdict(c){
   if (!c.feasible){
     box.className = "verdict no";
     h += "<h3>この原資では両立しません</h3>";
-    h += "<p>常勤換算 <b class='num'>"+n1(c.nmin)+"</b> 人を平均年収 <b class='num'>"+n1(c.atgt)+
-         "</b> 万円で雇うには給与原資 <b class='num'>"+man(c.needPool)+"</b>（人件費総額 <b class='num'>"+
-         man(c.needTotal)+"</b>）が必要で、いまの原資では <b class='num'>"+man(Math.abs(c.gap))+"</b> 足りません。</p>";
-    h += "<p>いまの原資で守れるのは、<b>人数なら "+n1(c.nCap)+" 人まで</b>か、<b>賃金なら平均 "+
-         n1(c.pool / (c.nmin || 1))+" 万円まで</b>のどちらかです。</p><ul>";
+    h += "<p>常勤換算 <b class='num'>"+n1(c.nmin)+"</b> 人を賃金下限 <b class='num'>"+n1(c.atgt)+
+         "</b> 万円（事業主負担込み "+n1(c.floorA)+"万円）で雇うには人件費総額 <b class='num'>"+
+         man(c.needTotal)+"</b> が必要で、いまの人件費では <b class='num'>"+man(Math.abs(c.gap))+"</b> 足りません。</p>";
+    h += "<p>いまの人件費で守れるのは、<b>人数なら "+n1(c.nCap)+" 人まで</b>か、<b>1人あたり給与費なら "+
+         n1(c.nmin > 0 ? c.total / c.nmin : 0)+" 万円まで</b>のどちらかです。</p><ul>";
     if (c.rev > 0) h += "<li>収益を変えずに両立させる → 人件費率 <b class='num'>"+pct(c.needRatio)+"</b>（現在 "+pct(c.effRatio)+"）</li>";
     if (c.effRatio > 0) h += "<li>人件費率を変えずに両立させる → 年間収益 <b class='num'>"+man(c.needRev)+"</b>（現在 "+man(c.rev)+"、差 "+man(c.needRev-c.rev)+"）</li>";
     h += "<li>どちらも動かせない → 配置か賃金のどちらを下げるかの判断になります</li></ul>";
   } else {
     box.className = "verdict";
     h += "<h3>成立する幅があります</h3>";
-    h += "<p>この原資なら、常勤換算 <b class='num'>"+n1(c.nmin)+"</b> 〜 <b class='num'>"+n1(c.nCap)+
+    h += "<p>この人件費なら、常勤換算 <b class='num'>"+n1(c.nmin)+"</b> 〜 <b class='num'>"+n1(c.nCap)+
          "</b> 人の範囲で両方の線を守れます。幅は <b class='num'>"+n1(c.nCap-c.nmin)+"</b> 人分です。</p>";
     if (c.okN && c.okA){
-      h += "<p>いまの置き方（<b class='num'>"+n1(c.n)+"</b> 人 / 平均 <b class='num'>"+n1(c.avg)+"</b> 万円）はこの範囲の中にあります。</p>";
+      h += "<p>いまの置き方（<b class='num'>"+n1(c.n)+"</b> 人 / 1人あたり給与費 <b class='num'>"+n1(c.avg)+"</b> 万円）はこの範囲の中にあります。</p>";
     } else {
       h += "<p><b>いまの置き方は範囲の外</b>です。";
       if (!c.okN) h += "人数が下限を "+n1(c.nmin-c.n)+" 人分下回っています。";
-      if (!c.okA) h += "平均年収が下限を "+n1(c.atgt-c.avg)+" 万円下回っています。";
+      if (!c.okA) h += "1人あたり給与費が下限（事業主負担込み "+n1(c.floorA)+"万円）を "+n1(c.floorA-c.avg)+" 万円下回っています。";
       h += "</p>";
     }
   }
@@ -993,7 +987,7 @@ function renderAnchor(c){
   }
   if (atgtTouched){
     h += "<p>賃金の余裕：<b class='num'>×" + c.slackWage.toFixed(2) +
-         "</b>（下回れない平均年収 " + n1(c.atgt) + " 万円に対する平均年収 " + n1(c.avg) + " 万円）</p>";
+         "</b>（下回れない平均年収 " + n1(c.atgt) + " 万円＝事業主負担込み " + n1(c.floorA) + " 万円 に対する1人あたり給与費 " + n1(c.avg) + " 万円）</p>";
   } else {
     h += "<p class='hint'>賃金の余裕を見るには「下回れない平均年収」を入れてください（初期値 " +
          n1(c.atgt) + " 万円はサンプルで、これを基準に診断すると未検証の値が判定基準になってしまいます）。</p>";
@@ -1044,7 +1038,7 @@ function renderTrend(c){
     h += "<div class='dcard'><div class='dh'>人件費を保つ場合</div>" +
          "<p>職員数が <b class='num'>"+n1(kr.n5)+" 人</b> に減ります<span class='s'>（現在 "+n1(kr.nNow)+" 人）</span></p>" +
          "<p class='dsub'>配置比率は <b class='"+(rbad?"warn-num":"")+"'>"+(kr.ratio5 > 0 ? n2(kr.ratio5)+" : 1" : "–")+"</b>"+
-           (rbad ? " <span class='warn-badge'>基準 "+stdR+" : 1 割れ</span>" : "")+" になります</p></div>";
+           (rbad ? " <span class='warn-badge'>基準 "+stdR+" : 1 割れ</span>" : "")+" になります（現在 "+n2(kr.ratioNow)+" : 1）</p></div>";
     h += "</div>";
     if (kr.breachYear){
       h += "<p class='dwarn'>この人件費のままだと <b>"+kr.breachYear+"年後</b>に配置比率が基準 "+stdR+" : 1 を割ります（賃金を上げた分、置ける職員が減るため）。</p>";
@@ -1058,8 +1052,8 @@ function renderTrend(c){
 
 function renderMarginal(c){
   var m = c.marg, h = "";
-  h += "<div class='row'><span class='k'>常勤換算を1人増やす</span><span class='v'>職員1人あたり給与費 −"+n1(m.perPerson)+" 万円</span></div>";
-  h += "<div class='row'><span class='k'>職員全員の給与費を10万円上げる：必要な追加原資</span><span class='v'>"+man(m.needMoreTotal)+"</span></div>";
+  h += "<div class='row'><span class='k'>常勤換算を1人増やす</span><span class='v'>1人あたり給与費 −"+n1(m.perPerson)+" 万円</span></div>";
+  h += "<div class='row'><span class='k'>1人あたり給与費を10万円上げる：必要な追加人件費</span><span class='v'>"+man(m.needMoreTotal)+"</span></div>";
   h += "<div class='row'><span class='k'>　同じことを人員削減でまかなうなら</span><span class='v'>常勤換算 −"+n1(m.cutN)+" 人</span></div>";
   if (c.rev > 0) h += "<div class='row'><span class='k'>　人件費率で吸収するなら</span><span class='v'>＋"+m.ptUp.toFixed(1)+" ポイント</span></div>";
   if (c.effRatio > 0) h += "<div class='row'><span class='k'>　収益増でまかなうなら</span><span class='v'>＋"+man(m.revUp)+"</span></div>";
@@ -1099,9 +1093,9 @@ function ratioAxis(c){
 function nAxis(c){
   var ax = ratioAxis(c);
   if (!ax || !(c.coreN > 0)) return null;
-  var nmin = ENGINE.staffNAtRatio(c, ax.rmax);   // 左端（薄い＝職員少）
-  var nmax = ENGINE.staffNAtRatio(c, ax.rmin);   // 右端（手厚い＝職員多）
-  return { ax:ax, nmin:nmin, nmax:nmax, nbase: ax.base ? ENGINE.staffNAtRatio(c, ax.base) : null };
+  var nmin = ENGINE.fteAllAtRatio(c, ax.rmax);   // 左端（薄い＝職員少）
+  var nmax = ENGINE.fteAllAtRatio(c, ax.rmin);   // 右端（手厚い＝職員多）
+  return { ax:ax, nmin:nmin, nmax:nmax, nbase: ax.base ? ENGINE.fteAllAtRatio(c, ax.base) : null };
 }
 function nFrac(nx, n){
   if (!nx || nx.nmax <= nx.nmin) return 0;
@@ -1122,11 +1116,12 @@ function renderChart(c){
   var svg = $("chart");
   while (svg.firstChild) svg.removeChild(svg.firstChild);
   var nx = nAxis(c), PW = VB.w-VB.l-VB.r, PH = VB.h-VB.t-VB.b;
-  if (!nx || !(c.pool > 0) || !(nx.nmax > nx.nmin)){ view = null; return; }
+  if (!nx || !(c.total > 0) || !(nx.nmax > nx.nmin)){ view = null; return; }
   view = { nx:nx, PW:PW };
-  /* 横軸＝職員数 n（正規＋非正規）。曲線は 給与原資÷n の双曲線。左端(nmin)で B 最大。 */
+  /* 横軸＝職員数 n（正規＋非正規＋派遣＝fteAll）。曲線は 人件費総額÷n の双曲線（＝1人あたり給与費A）。
+     左端(nmin)で A 最大。賃金下限は額面入力を事業主負担込み floorA に換算した位置に引く。 */
   var X = function(n){ return VB.l + nFrac(nx, n)*PW; };
-  var ymax = Math.max(c.pool/nx.nmin*1.10, c.atgt*1.35, c.B*1.15, 1);
+  var ymax = Math.max(c.total/nx.nmin*1.10, c.floorA*1.2, c.A*1.15, 1);
   var Y = function(v){ return VB.t + PH - (v/ymax)*PH; };
   var i, step = niceStep(ymax/5);
   for (i = step; i <= ymax; i += step){
@@ -1139,14 +1134,14 @@ function renderChart(c){
   }
   svg.appendChild(el("line",{x1:VB.l,x2:VB.l+PW,y1:VB.t+PH,y2:VB.t+PH,stroke:"#101F2B","stroke-width":1.5}));
   svg.appendChild(el("line",{x1:VB.l,x2:VB.l,y1:VB.t,y2:VB.t+PH,stroke:"#101F2B","stroke-width":1.5}));
-  svg.appendChild(el("text",{x:VB.l,y:VB.t-6,"font-size":10.5,fill:"#4A5C68"},"職員1人あたり給与費（額面・万円）"));
+  svg.appendChild(el("text",{x:VB.l,y:VB.t-6,"font-size":10.5,fill:"#4A5C68"},"1人あたり給与費（万円・事業主負担込み）"));
 
   /* 横軸: 2段目盛り。上段＝配置比率、下段＝対応する常勤換算数（職員数）。
      位置は人数空間なので間隔は不均等（手厚い側ほど広がる＝1段手厚くするコスト増が見える）。
      ラベルは左から貪欲に最小間隔をあけて描き、詰まった薄い端での重なりを避ける。 */
   var ticks = ratioTicks(nx.ax), lastLbl = -1e9, MINGAP = 38;
   ticks.forEach(function(R){
-    var n = ENGINE.staffNAtRatio(c, R), x = X(n);
+    var n = ENGINE.fteAllAtRatio(c, R), x = X(n);
     svg.appendChild(el("line",{x1:x,x2:x,y1:VB.t+PH,y2:VB.t+PH+4,stroke:"#101F2B","stroke-width":1}));   // 目盛り線は全点
     if (x - lastLbl < MINGAP) return;                                                                     // ラベルは重ならない分だけ
     lastLbl = x;
@@ -1155,11 +1150,11 @@ function renderChart(c){
   });
   svg.appendChild(el("text",{x:VB.l+PW,y:VB.t+PH+45,"text-anchor":"end","font-size":10,fill:"#4A5C68"},"上：配置比率／下：常勤換算数（人）　薄い ← → 手厚い"));
 
-  /* 等原資曲線 y=給与原資÷n（双曲線）。全域を破線、基準内かつ賃金下限以上の区間を太実線。 */
+  /* 等・人件費総額の曲線 y=人件費総額÷n（双曲線・＝1人あたり給与費A）。全域を破線、基準内かつ賃金下限以上を太実線。 */
   function seg(cond){
     var d = "", first = true;
     for (var s = 0; s <= 120; s++){
-      var n = nx.nmin + (nx.nmax - nx.nmin)*s/120, y = c.pool/n, R = ENGINE.ratioAtStaffN(c, n);
+      var n = nx.nmin + (nx.nmax - nx.nmin)*s/120, y = c.total/n, R = ENGINE.ratioAtFteAll(c, n);
       var on = (y > 0 && y <= ymax*1.02) && (!cond || cond(R, y));
       if (!on){ first = true; continue; }
       d += (first?"M":"L") + X(n).toFixed(1) + " " + Y(y).toFixed(1) + " ";
@@ -1168,9 +1163,9 @@ function renderChart(c){
     return d;
   }
   svg.appendChild(el("path",{d:seg(null),fill:"none",stroke:"#9FB0BC","stroke-width":1.5,"stroke-dasharray":"3 3"}));
-  /* 基準内（R<=基準）かつ 賃金下限以上（B>=atgt）。基準の無いサービスは賃金だけで判定 */
+  /* 基準内（R<=基準）かつ 賃金下限以上（A>=floorA）。基準の無いサービスは賃金だけで判定 */
   var okBand = seg(function(R, y){
-    return (!nx.ax.base || R <= nx.ax.base + 1e-9) && (!(c.atgt > 0) || y >= c.atgt - 1e-9);
+    return (!nx.ax.base || R <= nx.ax.base + 1e-9) && (!(c.atgt > 0) || y >= c.floorA - 1e-9);
   });
   if (okBand) svg.appendChild(el("path",{d:okBand,fill:"none",stroke:"#2A7F72","stroke-width":4,"stroke-linecap":"round"}));
   else if (c.atgt > 0) svg.appendChild(el("text",{x:VB.l+PW/2,y:VB.t+PH/2,"text-anchor":"middle","font-size":13,fill:"#B23A2E","font-weight":"600"},"両立する区間なし"));
@@ -1181,21 +1176,21 @@ function renderChart(c){
     svg.appendChild(el("line",{x1:xB,x2:xB,y1:VB.t,y2:VB.t+PH,stroke:"#B23A2E","stroke-width":1.4,"stroke-dasharray":"6 4"}));
     svg.appendChild(el("text",{x:xB+5,y:VB.t+12,"font-size":10.5,fill:"#B23A2E"},"基準 "+nx.ax.base+" : 1"));
   }
-  /* 賃金下限（横線） */
-  if (c.atgt > 0 && c.atgt < ymax){
-    svg.appendChild(el("line",{x1:VB.l,x2:VB.l+PW,y1:Y(c.atgt),y2:Y(c.atgt),stroke:"#1B4965","stroke-width":1.4,"stroke-dasharray":"6 4"}));
-    svg.appendChild(el("text",{x:VB.l+PW-4,y:Y(c.atgt)-6,"text-anchor":"end","font-size":10.5,fill:"#1B4965"},"賃金下限 "+n1(c.atgt)+"万円"));
+  /* 賃金下限（横線）＝額面入力を事業主負担込み floorA に換算した位置。ラベルは両方を併記して誤読を防ぐ。 */
+  if (c.atgt > 0 && c.floorA < ymax){
+    svg.appendChild(el("line",{x1:VB.l,x2:VB.l+PW,y1:Y(c.floorA),y2:Y(c.floorA),stroke:"#1B4965","stroke-width":1.4,"stroke-dasharray":"6 4","data-o":"wage"}));
+    svg.appendChild(el("text",{x:VB.l+PW-4,y:Y(c.floorA)-6,"text-anchor":"end","font-size":10.5,fill:"#1B4965"},"賃金下限 "+n1(c.atgt)+"万円（事業主負担込み "+n1(c.floorA)+"万円）"));
   }
 
-  /* いまの置き方の点（職員数 × 職員1人あたり給与費 B） */
-  if (c.staffN > 0 && c.B > 0 && c.B <= ymax){
-    var cx = X(c.staffN), cy = Y(c.B);
+  /* いまの置き方の点（職員数 fteAll × 1人あたり給与費 A） */
+  if (c.n > 0 && c.A > 0 && c.A <= ymax){
+    var cx = X(c.n), cy = Y(c.A);
     svg.appendChild(el("line",{x1:cx,x2:cx,y1:cy,y2:VB.t+PH,stroke:"#B8801F","stroke-width":1,"stroke-dasharray":"2 3"}));
     svg.appendChild(el("circle",{cx:cx,cy:cy,r:11,fill:"#B8801F","fill-opacity":.16}));
     svg.appendChild(el("circle",{cx:cx,cy:cy,r:5.5,fill:"#B8801F",stroke:"#fff","stroke-width":2,"data-o":"point"}));
     var right = cx > VB.l+PW*0.6;
     svg.appendChild(el("text",{x:cx+(right?-10:10),y:cy-16,"text-anchor":right?"end":"start","font-size":12,"font-weight":"600",fill:"#101F2B"},
-      n2(c.ratioActual)+" : 1 ／ "+n1(c.staffN)+"人 ／ "+n1(c.B)+"万円"));
+      n2(c.ratioActual)+" : 1 ／ "+n1(c.n)+"人 ／ "+n1(c.A)+"万円"));
   }
 }
 
@@ -1215,19 +1210,19 @@ function makeText(c){
         : c.shorts.length ? "未達 — " + c.shorts.map(function(x){ return x.name + " " + n1(x.gap) + "人不足"; }).join("、")
         : "すべての職種で基準以上"));
   if (isFinite(c.nMinComp)) L.push("　いまの構成で基準を満たす最小合計：" + n1(c.nMinComp) + " 人");
-  L.push("職員1人あたり給与費（額面・派遣除く）：" + n1(c.B) + " 万円／月例給 " + yen(c.B*10000/(12+c.bonus)) + "（賞与 " + c.bonus + "ヶ月換算）");
-  L.push("1人あたり給与費（派遣込み・事業主負担込み）：" + n1(c.A) + " 万円");
+  L.push("1人あたり給与費：" + n1(c.A) + " 万円（＝人件費総額÷職員数・事業主負担込み・派遣込み）");
+  L.push("賃金下限：" + n1(c.atgt) + " 万円（額面）＝事業主負担込み " + n1(c.floorA) + " 万円で比較");
   L.push("");
   L.push("雇用区分：正規 " + n1(c.nSe) + " 人／非正規 " + n1(c.nHi) + " 人／派遣 " + n1(c.nHk) + " 人（正規比率 " + c.regRatio.toFixed(1) + "％）");
-  if (c.nHk > 0) L.push("　派遣費用 " + man(c.hakenFee) + "（1人あたり " + n1(c.hakenUnit) + " 万・割り戻しなし）");
+  if (c.nHk > 0) L.push("　派遣費用 " + man(c.hakenFee) + "（1人あたり費用 " + n1(c.hakenUnit) + " 万・賃金ではなく委託費用）");
   if (c.svc.ratio && c.coreN > 0 && c.users > 0){
     L.push(c.svc.ratio.label + "：" + (c.svc.ratio.invert ? n1(c.ratioActual) + " 人／職員1人" : n2(c.ratioActual) + " : 1")
       + (c.ratioBad ? "　※基準未達" : ""));
   }
   L.push("");
   L.push("※ 配置基準の自動計算は主要職種の要約であり、加算要件・自治体条例・経過措置は未反映。");
-  L.push("※ 給与費は額面（Bは派遣除く）。1人あたり給与費A・派遣費用は派遣込み。");
-  L.push("※ 法定福利費率・賞与月数・収益・人件費総額の初期値はサンプル値（未検証）。");
+  L.push("※ 1人あたり給与費＝人件費総額÷職員数（正規＋非正規＋派遣）で事業主負担込み。賃金下限は額面入力を×(1+法定福利費)で比較。派遣は費用（賃金ではない）。");
+  L.push("※ 法定福利費率・収益・人件費総額の初期値はサンプル値（未検証）。");
   L.push("※ 収益・人件費は決算書ベースで、処遇改善加算は分離していません。派遣職員費は人件費の内数。");
   return L.join("\n");
 }
@@ -1242,7 +1237,7 @@ function update(){
   /* つまみ位置＝現在の職員数の人数軸上の割合（段階2追: 人数空間）。グラフ点の横位置と
      同じ nFrac から算出するので一致する（INV-26）。確定後も現在値を反映し勝手に戻らない。 */
   var nx = nAxis(c);
-  if (nx && c.staffN > 0) $("scale").value = nFrac(nx, c.staffN);
+  if (nx && c.n > 0) $("scale").value = nFrac(nx, c.n);
   $("o-ratiobar").textContent = (c.ratioActual > 0) ? n2(c.ratioActual) : "–";
   renderNumbers(c); renderEmp(c); renderRatio(c);
   renderCompliance(c); renderVerdict(c); renderNeedRatio(c); renderAnchor(c); renderMarginal(c); renderTrend(c); renderChart(c);
@@ -1296,7 +1291,7 @@ document.addEventListener("input", function(e){
   }
   if (t.id === "scale"){
     var nx = nAxis(last);
-    if (nx) foldCoreTo(ENGINE.ratioAtStaffN(last, fracToN(nx, parseFloat(t.value))));   // 割合f→目標職員数n→配置比率R
+    if (nx) foldCoreTo(ENGINE.ratioAtFteAll(last, fracToN(nx, parseFloat(t.value))));   // 割合f→目標職員数n→配置比率R
     return;
   }
   if (t.id === "nmin"){ nminTouched = true; update(); return; }
@@ -1340,7 +1335,7 @@ document.addEventListener("click", function(e){
     var px = (ev.clientX - box.left)/box.width*VB.w;
     var f = Math.min(1, Math.max(0, (px - VB.l)/view.PW));
     /* 横位置 f（0＝左＝薄い側＝職員少）を目標職員数 n→配置比率 R に戻し、介護・看護だけを畳む。 */
-    foldCoreTo(ENGINE.ratioAtStaffN(last, fracToN(view.nx, f)));
+    foldCoreTo(ENGINE.ratioAtFteAll(last, fracToN(view.nx, f)));
   }
   svg.addEventListener("pointerdown", function(e){ dragging = true; svg.setPointerCapture(e.pointerId); apply(e); });
   svg.addEventListener("pointermove", function(e){ if (dragging) apply(e); });

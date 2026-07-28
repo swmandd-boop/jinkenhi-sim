@@ -29,6 +29,6 @@ writeFileSync(resolve(root, "engine.mjs"),
   "/* 自動生成 — 直接編集しないこと。生成元: index.html */\n" +
   block + "\n\nexport default ENGINE;\n" +
   "export const { SERVICES, buildStandard, calcState, initialRows, scaleRows,\n" +
-  "  scaleCoreToRatio, staffNAtRatio, bAtRatio, ratioAtStaffN } = ENGINE;\n");
+  "  scaleCoreToRatio, fteAllAtRatio, aAtRatio, ratioAtFteAll } = ENGINE;\n");
 
 console.log(`engine.mjs を生成しました（${block.split("\n").length} 行）`);
