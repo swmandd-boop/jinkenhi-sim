@@ -70,13 +70,34 @@ async function measure(width) {
       const r = e.getBoundingClientRect();
       return { top: Math.round(r.top), over: e.scrollWidth - e.clientWidth };
     });
+    /* 移動したブロック（2026-07-28）:
+       - 免責・問い合わせ・版数（footer.site-footer）は左カラムの最後（STEP3の下）
+       - 「前提と出典の扱い」（.caveat）は左右カラムをまたぐ全幅ブロック
+       いずれも文字が欠けず、はみ出さないこと。全幅かどうかは .cols の幅と比べて判定する。 */
+    const box = (sel) => {
+      const e = document.querySelector(sel);
+      if (!e) return null;
+      const r = e.getBoundingClientRect();
+      return { left: Math.round(r.left), width: Math.round(r.width), top: Math.round(r.top),
+               over: e.scrollWidth - e.clientWidth };
+    };
+    const cols = document.querySelector(".cols").getBoundingClientRect();
+    const leftCol = document.querySelector(".cols > div:first-child").getBoundingClientRect();
+    const foot = document.querySelector("footer.site-footer");
     return {
       innerWidth: window.innerWidth,
       pageScrollW: document.documentElement.scrollWidth,
       container: sc.clientWidth, table: tbl.offsetWidth, tblScrollW: sc.scrollWidth,
       names, inputs, trendYearRightMargin,
       ratioTicks: rowOverlap('#chart [data-rt]'), headTicks: rowOverlap('#chart [data-nt]'),
-      dcards
+      dcards,
+      colsWidth: Math.round(cols.width), leftColWidth: Math.round(leftCol.width),
+      footer: box("footer.site-footer"),
+      footerInLeftCol: !!document.querySelector(".cols > div:first-child footer.site-footer"),
+      disclaimOver: (() => { const e = foot && foot.querySelector(".disclaim"); return e ? e.scrollWidth - e.clientWidth : 0; })(),
+      contactOver:  (() => { const e = foot && foot.querySelector(".contact"); return e ? e.scrollWidth - e.clientWidth : 0; })(),
+      caveat: box(".caveat"),
+      caveatOutsideCols: !document.querySelector(".cols .caveat")
     };
   });
 }
@@ -97,6 +118,17 @@ for (const w of [1280, 1440, 1680]) {
     assert.equal(m.dcards.length, 2, `${w}px: ジレンマ両面カードが2枚でない（${m.dcards.length}）`);
     for (const d of m.dcards) assert.ok(d.over <= 1, `${w}px: 両面カードの文字が欠けている（超過 ${d.over}px）`);
     assert.ok(Math.abs(m.dcards[0].top - m.dcards[1].top) <= 2, `${w}px: 両面カードが横並びになっていない`);
+    // 免責・問い合わせは左カラムの最後にあり、文字が欠けない
+    assert.ok(m.footerInLeftCol, `${w}px: 免責・問い合わせが左カラムに入っていない`);
+    assert.ok(m.footer.over <= 1, `${w}px: フッターの文字が欠けている（超過 ${m.footer.over}px）`);
+    assert.ok(m.disclaimOver <= 1, `${w}px: 免責一文が欠けている（超過 ${m.disclaimOver}px）`);
+    assert.ok(m.contactOver <= 1, `${w}px: 問い合わせ導線が欠けている（超過 ${m.contactOver}px）`);
+    assert.ok(m.footer.width <= m.leftColWidth + 2, `${w}px: フッターが左カラム幅を超えている（${m.footer.width} > ${m.leftColWidth}）`);
+    // 「前提と出典の扱い」は左右をまたぐ全幅ブロック
+    assert.ok(m.caveatOutsideCols, `${w}px: 前提と出典の扱いが .cols の中に残っている（全幅になっていない）`);
+    assert.ok(m.caveat.width >= m.colsWidth - 2, `${w}px: 前提と出典の扱いが全幅でない（${m.caveat.width} < ${m.colsWidth}）`);
+    assert.ok(m.caveat.width > m.leftColWidth * 1.5, `${w}px: 前提と出典の扱いが片カラム幅のまま（${m.caveat.width}）`);
+    assert.ok(m.caveat.over <= 1, `${w}px: 前提と出典の扱いの文字が欠けている（超過 ${m.caveat.over}px）`);
   });
 }
 
@@ -109,6 +141,12 @@ test("LAYOUT-narrow 狭幅：切って隠さず、横スクロールで逃がす
   assert.equal(m.dcards.length, 2, `狭幅: ジレンマ両面カードが2枚でない（${m.dcards.length}）`);
   for (const d of m.dcards) assert.ok(d.over <= 1, `狭幅: 両面カードの文字が欠けている（超過 ${d.over}px）`);
   assert.ok(Math.abs(m.dcards[0].top - m.dcards[1].top) > 2, `狭幅: 両面カードが縦積みになっていない（横並びのまま）`);
+  // 移動後も狭幅で欠けない（縦積み＝カラム幅＝画面幅になる）
+  assert.ok(m.footerInLeftCol, `狭幅: 免責・問い合わせが左カラムに入っていない`);
+  assert.ok(m.disclaimOver <= 1, `狭幅: 免責一文が欠けている（超過 ${m.disclaimOver}px）`);
+  assert.ok(m.contactOver <= 1, `狭幅: 問い合わせ導線が欠けている（超過 ${m.contactOver}px）`);
+  assert.ok(m.caveat.over <= 1, `狭幅: 前提と出典の扱いの文字が欠けている（超過 ${m.caveat.over}px）`);
+  assert.ok(m.caveatOutsideCols, `狭幅: 前提と出典の扱いが .cols の中に残っている`);
 });
 
 /* スマホ実機（iPhone エミュレーション・touch）：職種表(min-width)がページ全体を広げず、本体が
