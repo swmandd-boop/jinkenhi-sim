@@ -880,15 +880,18 @@ function renderRatio(c){
            '</span><span class="s">万円　人件費総額÷（正規＋非正規＋派遣）・事業主負担込み'+avgNote+'</span></div>';
   cells += '<div class="cell"><span class="k">正規比率</span><span class="v">'+c.regRatio.toFixed(1)+
            ' ％</span><span class="s">職員ベース（非正規 '+n1(c.nHi)+'／派遣 '+n1(c.nHk)+' 人）</span></div>';
-  if (r && c.ratioActual != null){   // 核0・利用者0 では比率を定義できないのでセル自体を出さない
+  /* 配置比率のセルは「法令の比率基準があるサービス」でだけ出す（案B・水田さん判断 2026-07-28）。
+     通所介護には対利用者の比率基準が無く、基準がないのに数字だけ出すと、見た人は比較先を探すが
+     比べる相手がない。加えて、同じ位置の同じセルが他サービスでは基準との比較に使われており、
+     サービスによって意味が変わるのは「同じ名前で違うものを指す」問題そのものになる。
+     核0・利用者0（比率が定義できない）でもセルを出さない。 */
+  if (r && hasRatioStd(c) && c.ratioActual != null){
     if (r.invert){
       cells += '<div class="cell"><span class="k">'+r.label+'</span><span class="v">'+n1(c.ratioActual)+
                '</span><span class="s">人／職員1人（常勤換算 '+n1(c.coreN)+' 人）</span></div>';
     } else {
-      var s = r.std
-        ? (c.ratioBad ? "<b>基準 "+r.std+" : 1 を満たしていません</b>"
-                      : "基準 "+r.std+" : 1 の "+n2(r.std/c.ratioActual)+" 倍の手厚さ")
-        : "常勤換算ベース";
+      var s = c.ratioBad ? "<b>基準 "+r.std+" : 1 を満たしていません</b>"
+                         : "基準 "+r.std+" : 1 の "+n2(r.std/c.ratioActual)+" 倍の手厚さ";
       cells += '<div class="cell'+(c.ratioBad?" warn":"")+'"><span class="k">'+r.label+'</span><span class="v">'+
                n2(c.ratioActual)+' : 1</span><span class="s">'+s+'</span></div>';
     }
@@ -1291,7 +1294,9 @@ function makeText(c){
   L.push("");
   L.push("雇用区分：正規 " + n1(c.nSe) + " 人／非正規 " + n1(c.nHi) + " 人／派遣 " + n1(c.nHk) + " 人（正規比率 " + c.regRatio.toFixed(1) + "％）");
   if (c.nHk > 0) L.push("　派遣費用 " + man(c.hakenFee) + "（1人あたり費用 " + n1(c.hakenUnit) + " 万・賃金ではなく委託費用）");
-  if (c.svc.ratio && c.coreN > 0 && c.users > 0){
+  /* 配置比率は法令の比率基準があるサービスでだけ書き出す（指標バーと同じ理由：基準の無い
+     通所で数字だけ出すと、比べる相手がないまま独り歩きする）。 */
+  if (hasRatioStd(c) && c.coreN > 0 && c.users > 0){
     L.push(c.svc.ratio.label + "：" + (c.ratioActual == null ? "－（介護・看護が0のため算出不能）"
       : (c.svc.ratio.invert ? n1(c.ratioActual) + " 人／職員1人" : n2(c.ratioActual) + " : 1"))
       + (c.ratioBad ? "　※基準未達" : ""));
