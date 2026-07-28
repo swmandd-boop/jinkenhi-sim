@@ -221,7 +221,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
       <div class="legend">
         <span id="lg-band"><i style="border-color:var(--take)"></i>基準内かつ賃金下限を満たす区間</span>
         <span><i style="border-color:var(--ai);border-top-style:dashed"></i>賃金下限</span>
-        <span id="lg-base"><i style="border-color:var(--shu);border-top-style:dashed"></i>基準線</span>
+        <span id="lg-base"><i style="border-color:var(--shu);border-top-style:dashed"></i>基準線（配置比率）</span>
         <span><i style="border-color:var(--kohaku)"></i>いまの置き方</span>
       </div>
       <div class="scaler">
@@ -1181,8 +1181,11 @@ function renderChartChrome(c){
       + "（人員基準は職種別に判定し、充足の可否は下の判定欄に出します）。"
       + "縦の基準線は<b>基準の単純合計（各職種の基準を足した人数）</b>の位置で、そこから左は基準を下回る領域です。"
       + "賃金下限は額面入力を事業主負担込み（×(1+法定福利費率)）に換算した位置に引きます。";
-  $("lg-base").hidden = false;                            // 比率基準あり＝比率の基準線／なし＝人数の基準マーカー
-  $("lg-band").lastChild.textContent = withRatio ? "基準内かつ賃金下限を満たす区間" : "賃金下限を満たす区間";
+  /* 凡例（2026-07-28 統一）。帯はどのサービスでも同じ意味なので同じ語。
+     基準線は「配置比率の基準」と「人数の基準」で意味が違うので、同じ語のまま放置せず括弧で区別する。 */
+  $("lg-base").hidden = false;
+  $("lg-base").lastChild.textContent = withRatio ? "基準線（配置比率）" : "基準線（人数）";
+  $("lg-band").lastChild.textContent = "基準内かつ賃金下限を満たす区間";   // 意味は同じなのでサービスによらず同文
   /* スライダーのラベル。比率基準があれば比率を主に、無ければ職員数を主にする。
      o-n は職種表の footer と同じ値（refreshTable が書く）。o-ratiobar は比率があるときだけ作る。 */
   $("scale-label").innerHTML = withRatio
@@ -1258,7 +1261,7 @@ function renderChart(c){
     var d = "", first = true;
     for (var s = 0; s <= 120; s++){
       var n = nx.nmin + (nx.nmax - nx.nmin)*s/120, y = c.total/n, R = ENGINE.ratioAtFteAll(c, n);
-      var on = (y > 0 && y <= ymax*1.02) && (!cond || cond(R, y));
+      var on = (y > 0 && y <= ymax*1.02) && (!cond || cond(R, y, n));
       if (!on){ first = true; continue; }
       d += (first?"M":"L") + X(n).toFixed(1) + " " + Y(y).toFixed(1) + " ";
       first = false;
@@ -1266,9 +1269,17 @@ function renderChart(c){
     return d;
   }
   svg.appendChild(el("path",{d:seg(null),fill:"none",stroke:"#9FB0BC","stroke-width":1.5,"stroke-dasharray":"3 3"}));
-  /* 基準内（R<=基準）かつ 賃金下限以上（A>=floorA）。基準の無いサービスは賃金だけで判定 */
-  var okBand = seg(function(R, y){
-    return (!nx.ax || !nx.ax.base || (R != null && R <= nx.ax.base + 1e-9)) && (!(c.atgt > 0) || y >= c.floorA - 1e-9);
+  /* 太実線＝「ここなら成立する」区間。基準内 かつ 賃金下限以上。
+     ★基準の判定はサービスによって物差しが違うだけで、意味は同じ：
+       比率基準あり → 配置比率が基準以下（R <= 基準）
+       比率基準なし → 職員数が基準の単純合計以上（n >= nbase）
+     以前は比率基準の無いサービスで基準による切り出しをしておらず、基準を割った領域まで
+     帯が伸びて「そこも成立する」と読めてしまった（充足判定パネルは同時に「下回っています」と
+     出るため、同じ画面が逆の合図を出していた）。 */
+  var okBand = seg(function(R, y, n){
+    var inStd = nx.ax && nx.ax.base ? (R != null && R <= nx.ax.base + 1e-9)
+              : (nx.nbase == null || n >= nx.nbase - 1e-9);
+    return inStd && (!(c.atgt > 0) || y >= c.floorA - 1e-9);
   });
   if (okBand) svg.appendChild(el("path",{d:okBand,fill:"none",stroke:"#2A7F72","stroke-width":4,"stroke-linecap":"round"}));
   else if (c.atgt > 0) svg.appendChild(el("text",{x:VB.l+PW/2,y:VB.t+PH/2,"text-anchor":"middle","font-size":13,fill:"#B23A2E","font-weight":"600"},"両立する区間なし"));

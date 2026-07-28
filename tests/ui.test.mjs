@@ -493,6 +493,14 @@ function chartFacts(t) {
     baseLines:  [...d.querySelectorAll("#chart line")].filter(e => e.getAttribute("stroke") === "#B23A2E").length,
     baseLabel:  (d.querySelector('#chart [data-o="baselabel"]') || {}).textContent || "",
     baseMarkX:  (() => { const e = d.querySelector('#chart [data-o="basemark"]'); return e ? parseFloat(e.getAttribute("x1")) : null; })(),
+    bandLeftX:  (() => {
+      const p = [...d.querySelectorAll("#chart path")].find(e => e.getAttribute("stroke") === "#2A7F72");
+      if (!p) return null;
+      const xs = (p.getAttribute("d").match(/[ML]([\d.]+)/g) || []).map(t => parseFloat(t.slice(1)));
+      return xs.length ? Math.min(...xs) : null;
+    })(),
+    legendBand: d.getElementById("lg-band").textContent.trim(),
+    legendBase: d.getElementById("lg-base").textContent.trim(),
     legendBaseHidden: d.getElementById("lg-base").hidden,
     note:  d.getElementById("chartnote").textContent,
     label: d.getElementById("scale-label").textContent.replace(/\s+/g, " ").trim()
@@ -509,6 +517,7 @@ test("AXB-01 通所介護では比率目盛り・基準線・凡例の基準線�
      「基準線が0本」ではなく「**比率**の基準線ではないこと」を固定する。 */
   assert.ok(!/[\d.]+\s*:\s*1/.test(f.baseLabel), `通所の基準ラベルが比率になっている: ${f.baseLabel}`);
   assert.equal(f.legendBaseHidden, false, `通所で凡例の基準線が消えている（人数マーカーを引くので出す）`);
+  assert.ok(f.legendBase.includes("人数"), `通所の凡例が比率の基準線のままになっている: ${f.legendBase}`);
   assert.ok(!f.label.includes("配置比率"), `通所のスライダーが比率ラベルのまま: ${f.label}`);
   assert.ok(f.label.includes("職員数"), `通所のスライダーが職員数主表示でない: ${f.label}`);
   assert.ok(!f.note.includes("基準割れ"), `通所の説明に「基準割れ」が残っている`);
@@ -690,4 +699,55 @@ test("AXB-06 特養系には人数マーカーを足さず、比率の基準線�
     assert.ok(!f.baseLabel.includes("人"), `${svc}: 人数マーカーが混ざっている: ${f.baseLabel}`);
     assert.equal(f.baseLines, 1, `${svc}: 基準の縦線が1本でない（${f.baseLines}本）＝重複して引かれている`);
   }
+});
+
+/* AXB-07（2026-07-28・release-gate 第3回 H1 への対応）:
+   緑の太実線は「ここなら成立する」区間なので、**基準を割った領域を含めてはいけない**。
+   以前は比率基準の無いサービス（通所）で基準による切り出しをしておらず、賃金下限だけで帯を
+   引いていたため、基準割れの位置まで帯が伸び、充足判定パネルの「下回っています」と
+   同じ画面で逆の合図を出していた。基準の物差しはサービスで違うが（比率／人数）意味は同じ。 */
+test("AXB-07 緑の帯は基準を割った領域を含まない（全サービス）", () => {
+  for (const svc of ["tsuusho", "tokuyou", "unit", "roken"]) {
+    const t = open();
+    t.svc(svc);
+    t.set("atgt", 300);                    // 賃金下限を下げ、帯が賃金側で切れないようにする
+    const f = chartFacts(t);
+    assert.ok(f.baseMarkX != null, `${svc}: 基準の縦線がない`);
+    assert.ok(f.bandLeftX != null, `${svc}: 緑の帯が描かれていない`);
+    assert.ok(f.bandLeftX >= f.baseMarkX - 1,
+      `${svc}: 緑の帯が基準より左（基準割れ側）まで伸びている（帯左端 ${f.bandLeftX} < 基準 ${f.baseMarkX}）`);
+  }
+});
+
+test("AXB-08 基準割れの位置では、グラフと充足判定が同じことを言う", () => {
+  const t = open();
+  t.svc("tsuusho");
+  t.set("atgt", 300);
+  slide(t, 0);                             // 左端＝基準を割る位置
+  assert.ok(t.txt("#compliance h3").includes("下回っています"), `前提: 基準割れになっていない`);
+  const f = chartFacts(t);
+  const pt = t.d.querySelector('#chart [data-o="point"]');
+  const px = parseFloat(pt.getAttribute("cx"));
+  // 点が帯の外にある＝グラフも「成立しない」と言っている（画面内で逆の合図を出さない）
+  assert.ok(f.bandLeftX == null || px < f.bandLeftX - 0.5,
+    `基準割れなのに点が緑の帯の内側にある（点 ${px} / 帯左端 ${f.bandLeftX}）`);
+});
+
+test("AXB-09 凡例は、同じ意味の要素を同じ語で呼び、違う意味の要素を区別する", () => {
+  const facts = {};
+  for (const svc of ["tsuusho", "tokuyou", "unit", "roken"]) {
+    const t = open();
+    t.svc(svc);
+    facts[svc] = chartFacts(t);
+  }
+  // 帯：どのサービスでも同じ意味 → 同じ語
+  const bands = Object.values(facts).map(f => f.legendBand);
+  assert.equal(new Set(bands).size, 1, `帯の凡例がサービスで違う: ${JSON.stringify(bands)}`);
+  assert.ok(bands[0].includes("基準内") && bands[0].includes("賃金下限"), `帯の凡例が意味を表していない: ${bands[0]}`);
+  // 基準線：意味が違う（配置比率の基準／人数の基準）→ 語を区別する
+  assert.ok(facts.tsuusho.legendBase.includes("人数"), `通所の基準線の凡例が人数と分かる語でない: ${facts.tsuusho.legendBase}`);
+  for (const svc of ["tokuyou", "unit", "roken"]) {
+    assert.ok(facts[svc].legendBase.includes("配置比率"), `${svc}の基準線の凡例が配置比率と分かる語でない: ${facts[svc].legendBase}`);
+  }
+  assert.notEqual(facts.tsuusho.legendBase, facts.tokuyou.legendBase, `違う意味の基準線が同じ語で呼ばれている`);
 });
