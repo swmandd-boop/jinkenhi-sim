@@ -854,3 +854,62 @@ test("AXB-11 凡例に破線と塗りの読み方がある（見えるが成立�
     assert.ok(t.d.querySelector("#lg-fill i.sw"), `${svc}: 塗りの凡例の見本が面になっていない`);
   }
 });
+
+/* ★2026-07-28 実バグ：帯を描く if と「区間なし」の else の間に別の if を割り込ませたため、
+   else の結合先がずれ、帯が描かれていても朱色の文言が同時に出ていた（全4サービスで再現）。
+   帯の有無という1つの値からしか出さないことを固定する。 */
+/* 属性ではなく文言で拾う。属性で拾うと「旧実装に属性が無いだけ」でテストが通ってしまい、
+   fail-before が実証できない（この書き分けで実際に取り違えかけた）。 */
+const noBandMsg = t => [...t.d.querySelectorAll("#chart text")]
+  .find(e => /区間(なし|がありません)/.test(e.textContent)) || null;
+
+test("AXB-13 帯が描かれているとき、グラフ内の「区間がありません」は出ない", () => {
+  for (const svc of ["tsuusho", "tokuyou", "unit", "roken"]) {
+    for (const atgt of [250, 300, 400]) {
+      const t = open();
+      t.svc(svc);
+      t.set("atgt", atgt);
+      for (const f of [0, 0.25, 0.5, 0.75, 1]) {
+        slide(t, f);
+        const b = bandRange(t), m = noBandMsg(t);
+        assert.ok(b, `${svc} 賃金下限${atgt} f=${f}: 帯が引けるはずの条件で帯が無い`);
+        assert.ok(!m, `${svc} 賃金下限${atgt} f=${f}: 帯があるのに「${m && m.textContent}」が同時に出ている`);
+      }
+    }
+  }
+});
+
+test("AXB-14 帯が消えるとき（賃金下限が高すぎる）はグラフ内に理由が出る", () => {
+  for (const svc of ["tsuusho", "tokuyou", "unit", "roken"]) {
+    const t = open();
+    t.svc(svc);
+    t.set("atgt", 3000);                 // 基準どおりの人数をこの賃金では雇えない
+    const c = stateOf(t);
+    assert.ok(c.avg < c.floorA, `${svc}: 前提が崩れている（賃金下限を超えてしまっている）`);
+    assert.equal(bandRange(t), null, `${svc}: 帯が消えるはずの条件で帯が残っている`);
+    const m = noBandMsg(t);
+    assert.ok(m, `${svc}: 帯が無いのにグラフが理由を出していない`);
+    assert.ok(m.textContent.includes("賃金下限"), `${svc}: 文言に理由（賃金下限）が入っていない: ${m.textContent}`);
+  }
+});
+
+test("AXB-15 帯の有無と朱色メッセージの有無は常に排他（4サービス×つまみ位置×賃金下限）", () => {
+  let both = 0, neither = 0, n = 0;
+  for (const svc of ["tsuusho", "tokuyou", "unit", "roken"]) {
+    for (const atgt of [200, 350, 450, 600, 3000]) {
+      const t = open();
+      t.svc(svc);
+      t.set("atgt", atgt);
+      for (const f of [0, 0.2, 0.4, 0.6, 0.8, 1]) {
+        slide(t, f);
+        const b = !!bandRange(t), m = !!noBandMsg(t);
+        n++;
+        if (b && m) both++;
+        if (!b && !m) neither++;
+      }
+    }
+  }
+  assert.equal(n, 120, `検証したケース数が想定と違う: ${n}`);
+  assert.equal(both, 0, `帯と「区間がありません」が同時に出たケース: ${both}/${n}`);
+  assert.equal(neither, 0, `帯も理由も出ないケース（画面が黙る）: ${neither}/${n}`);
+});

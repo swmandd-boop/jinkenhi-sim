@@ -1301,23 +1301,28 @@ function renderChart(c){
          (2) chartnote に同じ趣旨を明記
          (3) 帯の内側なのに職種別が未達のときは、グラフ上に朱色で名指しする（下記 warnGap）
        (3) があるので、矛盾が実際に起きた瞬間には画面が黙っていない。 */
-  var okBand = seg(function(R, y, n){
+  /* ★帯の条件はこの1つの関数だけが持つ（E-008：同じ量を2か所で計算しない）。
+     帯そのもの・点が帯の内側か・帯が空のときのメッセージは、すべてここから派生させる。 */
+  function inBand(R, y, n){
     var inRatio = (nx.ax && nx.ax.base) ? (R != null && R <= nx.ax.base + 1e-9) : true;
     var inStd   = (nx.nbase == null || n >= nx.nbase - 1e-9);   // 基準の単純合計（固定）
     return inRatio && inStd && (!(c.atgt > 0) || y >= c.floorA - 1e-9);
-  });
-  if (okBand) svg.appendChild(el("path",{d:okBand,fill:"none",stroke:"#2A7F72","stroke-width":4,"stroke-linecap":"round"}));
-  /* 帯は合計人数で切っているので、合計は足りていても職種別が未達のことがある
-     （事務や調理を厚くして介護・看護が基準を割る等）。その場合は帯の中に点があっても
-     「成立していない」ので、グラフ側でも名指しする（充足判定パネルと逆の合図を出さない）。 */
-  var pointInBand = (!(nx.ax && nx.ax.base) || (c.ratioActual != null && c.ratioActual <= nx.ax.base + 1e-9))
-                 && (nx.nbase == null || c.n >= nx.nbase - 1e-9)
-                 && (!(c.atgt > 0) || c.avg >= c.floorA - 1e-9);
-  if (pointInBand && (c.shorts.length || c.blocked)){
-    svg.appendChild(el("text",{x:VB.l+8,y:VB.t+PH-10,"font-size":11,fill:"#B23A2E","font-weight":"600","data-o":"gapwarn"},
-      "合計は足りていますが、職種別の基準を満たしていません（下の判定欄）"));
   }
-  else if (c.atgt > 0) svg.appendChild(el("text",{x:VB.l+PW/2,y:VB.t+PH/2,"text-anchor":"middle","font-size":13,fill:"#B23A2E","font-weight":"600"},"両立する区間なし"));
+  var okBand = seg(inBand);
+  if (okBand){
+    svg.appendChild(el("path",{d:okBand,fill:"none",stroke:"#2A7F72","stroke-width":4,"stroke-linecap":"round"}));
+    /* 帯は合計人数で切っているので、合計は足りていても職種別が未達のことがある
+       （事務や調理を厚くして介護・看護が基準を割る等）。その場合は帯の中に点があっても
+       「成立していない」ので、グラフ側でも名指しする（充足判定パネルと逆の合図を出さない）。 */
+    if (inBand(c.ratioActual, c.avg, c.n) && (c.shorts.length || c.blocked)){
+      svg.appendChild(el("text",{x:VB.l+8,y:VB.t+PH-10,"font-size":11,fill:"#B23A2E","font-weight":"600","data-o":"gapwarn"},
+        "合計は足りていますが、職種別の基準を満たしていません（下の判定欄）"));
+    }
+  }
+  /* 帯が1点も引けないとき＝基準どおりの人数を賃金下限で雇えないとき。
+     グラフが「緑が無い理由」を黙らないための表示（判定欄の「この原資では両立しません」の
+     グラフ側の合図）。帯の有無だけから出すので、帯と同時に出ることはない。 */
+  else if (c.atgt > 0) svg.appendChild(el("text",{x:VB.l+PW/2,y:VB.t+PH/2,"text-anchor":"middle","font-size":13,fill:"#B23A2E","font-weight":"600","data-o":"noband"},"この賃金下限では、基準を満たす区間がありません"));
 
   /* 基準線（例: 3:1）＝対応する職員数の位置 */
   if (nx.nbase != null && nx.nbase > nx.nmin && nx.nbase < nx.nmax){
