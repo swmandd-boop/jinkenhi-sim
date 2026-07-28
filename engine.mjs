@@ -254,12 +254,21 @@ var SERVICES = {
                     配置比率(5)=入所者数 ÷（n(5)−その他職員） */
     var fD = grow(5);
     var n5 = (fD > 0) ? n / fD : n, core5 = n5 - otherStaff;
+    /* 人件費を保つ側は原資一定で賃金だけ上がり、職員（＝配置）が減る。配置比率が法令基準（3:1 等）を
+       割る年を出す。判定は svc.ratio.std がある場合のみ（法令基準に対してのみ・閾値は発明しない）。 */
+    var stdR = (svc.ratio && svc.ratio.std) ? svc.ratio.std : null;
+    function ratioAtY(t){ var nt = n / grow(t), cr = nt - otherStaff; return (users > 0 && cr > 0) ? users / cr : 0; }
+    var r3 = ratioAtY(3), r5 = (users > 0 && core5 > 0) ? users / core5 : 0;
+    var breachYear = null;
+    if (stdR){ if (r3 > stdR + 1e-9) breachYear = 3; else if (r5 > stdR + 1e-9) breachYear = 5; }
     proj.dilemma = {
       t: 5,
-      keepStaff: { ratio: effRatio * fD, ratioNow: effRatio, deltaTotal: total * (fD - 1) },
+      keepStaff: { ratio: effRatio * fD, ratioNow: effRatio, deltaTotal: total * (fD - 1), totalNew: total * fD },
       keepRatio: {
         nNow: n, n5: n5, ratioNow: ratioActual,
-        ratio5: (users > 0 && core5 > 0) ? users / core5 : 0
+        ratio3: r3, ratio5: r5,
+        std: stdR, breachYear: breachYear,
+        ratio5Bad: !!(stdR && r5 > stdR + 1e-9)
       }
     };
 

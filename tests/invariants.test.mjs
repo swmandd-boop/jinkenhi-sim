@@ -401,6 +401,30 @@ test("DIL-03 g=0 では両面が現在値に一致", () => {
     assert.ok(near(d.keepStaff.deltaTotal, 0), `${s}: 人件費増分=0`);
     assert.ok(near(d.keepRatio.n5, c.staffN), `${s}: n5=現在`);
     assert.ok(near(d.keepRatio.ratio5, c.ratioActual, 1e-9), `${s}: 配置比率(5)=現在`);
+    assert.equal(d.keepRatio.breachYear, null, `${s}: g=0で基準割れ年はなし`);
+  }
+});
+
+/* ---- DIL-04 人件費を保つ側: 配置比率(t)=入所者÷(n(t)−その他職員)（t=3,5）と、基準割れ年 ----
+   賃金だけ上げて原資を保つと職員（配置）が減り、配置比率(t)=users/(n(t)−その他) が大きくなる。
+   法令基準（svc.ratio.std）がある場合、3年→5年の順で最初に基準を割る年を breachYear に返す。 */
+test("DIL-04 人件費を保つ側の配置比率(t) と 基準割れ年", () => {
+  for (const s of ALL) {
+    for (const g of [1, 3, 5]) {
+      const c = calcState(makeInput(s, { g })), d = c.proj.dilemma.keepRatio;
+      const rAt = t => { const nt = c.staffN / Math.pow(1 + g / 100, t); const core = nt - c.otherStaff; return core > 0 ? c.users / core : 0; };
+      if (c.staffN / Math.pow(1 + g / 100, 3) - c.otherStaff > 0)
+        assert.ok(near(d.ratio3, rAt(3), 1e-9), `${s} g=${g}: ratio3=${d.ratio3} ≠ ${rAt(3)}`);
+      assert.ok(near(d.ratio5, rAt(5), 1e-9), `${s} g=${g}: ratio5=${d.ratio5} ≠ ${rAt(5)}`);
+      const std = c.svc.ratio && c.svc.ratio.std;
+      if (std) {
+        const expect = rAt(3) > std + 1e-9 ? 3 : rAt(5) > std + 1e-9 ? 5 : null;
+        assert.equal(d.breachYear, expect, `${s} g=${g}: breachYear=${d.breachYear} 期待${expect}`);
+        assert.equal(d.ratio5Bad, rAt(5) > std + 1e-9, `${s} g=${g}: ratio5Bad`);
+      } else {
+        assert.equal(d.breachYear, null, `${s} g=${g}: 法令基準なしは基準割れ年なし`);
+      }
+    }
   }
 });
 

@@ -79,6 +79,10 @@ b.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .dcard p:last-child{margin-bottom:0}
 .dcard .num{font-size:17px;font-weight:600}
 .dcard .s{font-size:11px;color:var(--ink-2)}
+.dcard .dsub{font-size:12px;color:var(--ink-2);margin-top:2px}
+.dcard .dsub .warn-num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px;font-weight:600;color:var(--shu)}
+.dcard .warn-badge{color:var(--shu);font-weight:600;font-size:11px}
+.dwarn{margin:8px 0 0;font-size:12.5px;color:var(--shu);font-weight:600}
 @media(max-width:560px){.dilemma{grid-template-columns:1fr}}
 table{width:100%;min-width:34em;table-layout:fixed;border-collapse:collapse;font-size:13px}
 th,td{padding:6px 4px;border-bottom:1px solid var(--rule);text-align:right;vertical-align:middle}
@@ -605,12 +609,21 @@ var SERVICES = {
                     配置比率(5)=入所者数 ÷（n(5)−その他職員） */
     var fD = grow(5);
     var n5 = (fD > 0) ? n / fD : n, core5 = n5 - otherStaff;
+    /* 人件費を保つ側は原資一定で賃金だけ上がり、職員（＝配置）が減る。配置比率が法令基準（3:1 等）を
+       割る年を出す。判定は svc.ratio.std がある場合のみ（法令基準に対してのみ・閾値は発明しない）。 */
+    var stdR = (svc.ratio && svc.ratio.std) ? svc.ratio.std : null;
+    function ratioAtY(t){ var nt = n / grow(t), cr = nt - otherStaff; return (users > 0 && cr > 0) ? users / cr : 0; }
+    var r3 = ratioAtY(3), r5 = (users > 0 && core5 > 0) ? users / core5 : 0;
+    var breachYear = null;
+    if (stdR){ if (r3 > stdR + 1e-9) breachYear = 3; else if (r5 > stdR + 1e-9) breachYear = 5; }
     proj.dilemma = {
       t: 5,
-      keepStaff: { ratio: effRatio * fD, ratioNow: effRatio, deltaTotal: total * (fD - 1) },
+      keepStaff: { ratio: effRatio * fD, ratioNow: effRatio, deltaTotal: total * (fD - 1), totalNew: total * fD },
       keepRatio: {
         nNow: n, n5: n5, ratioNow: ratioActual,
-        ratio5: (users > 0 && core5 > 0) ? users / core5 : 0
+        ratio3: r3, ratio5: r5,
+        std: stdR, breachYear: breachYear,
+        ratio5Bad: !!(stdR && r5 > stdR + 1e-9)
       }
     };
 
@@ -1004,10 +1017,10 @@ function renderTrend(c){
   h += "<table style='width:100%;table-layout:fixed;border-collapse:collapse;font-variant-numeric:tabular-nums'>";
   h += "<tr><td style='padding:4px 8px;width:30%'></td><th style='"+cols+";width:20%'>3年後</th>" +
        "<th style='"+cols+";width:20%'>5年後</th><th style='"+cols+";width:22%'>10年後</th>"+sp+"</tr>";
-  h += "<tr><td style='padding:4px 8px'>人件費率</td>" +
-       p.horizons.map(function(x){ return "<td style='"+cols+"'>"+pct(x.ratio)+"</td>"; }).join("") + sp + "</tr>";
   h += "<tr><td style='padding:4px 8px'>人件費の増分</td>" +
        p.horizons.map(function(x){ return "<td style='"+cols+"'>"+man(x.delta)+"</td>"; }).join("") + sp + "</tr>";
+  h += "<tr><td style='padding:4px 8px'>人件費率</td>" +
+       p.horizons.map(function(x){ return "<td style='"+cols+"'>"+pct(x.ratio)+"</td>"; }).join("") + sp + "</tr>";
   h += "</table>";
   if (p.g > 0){
     var a = p.absorb;
@@ -1020,15 +1033,23 @@ function renderTrend(c){
        上の前提文（収入横ばい・報酬改定を織り込まない）の適用範囲に、この2枚も含まれる配置。 */
     var d = p.dilemma;
     h += "<p style='margin-top:14px;font-weight:600'>同じジレンマの両面（"+d.t+"年後）</p>";
+    var kr = d.keepRatio, stdR = kr.std;
     h += "<div class='dilemma'>";
+    // 左：人数を保つ場合＝人件費（金額）を主・人件費率を従にする
     h += "<div class='dcard'><div class='dh'>人数を保つ場合</div>" +
-         "<p>人件費率が <b class='num'>"+pct(d.keepStaff.ratio)+"</b> に上がります<span class='s'>（現在 "+pct(d.keepStaff.ratioNow)+"）</span></p>" +
-         "<p>人件費は <b class='num'>"+man(d.keepStaff.deltaTotal)+"</b> 増えます</p></div>";
-    h += "<div class='dcard'><div class='dh'>人件費率を保つ場合</div>" +
-         "<p>職員数が <b class='num'>"+n1(d.keepRatio.n5)+" 人</b> に減ります<span class='s'>（現在 "+n1(d.keepRatio.nNow)+" 人）</span></p>" +
-         "<p>配置比率は <b class='num'>"+(d.keepRatio.ratio5 > 0 ? n2(d.keepRatio.ratio5)+" : 1" : "–")+"</b> になります</p></div>";
+         "<p>人件費が <b class='num'>"+man(d.keepStaff.deltaTotal)+"</b> 増えます</p>" +
+         "<p class='dsub'>人件費率は "+pct(d.keepStaff.ratio)+" になります（現在 "+pct(d.keepStaff.ratioNow)+"）</p></div>";
+    // 右：人件費を保つ場合＝職員数（配置）が減る。配置比率が基準を割るなら朱色で明示
+    var rbad = kr.ratio5Bad;
+    h += "<div class='dcard'><div class='dh'>人件費を保つ場合</div>" +
+         "<p>職員数が <b class='num'>"+n1(kr.n5)+" 人</b> に減ります<span class='s'>（現在 "+n1(kr.nNow)+" 人）</span></p>" +
+         "<p class='dsub'>配置比率は <b class='"+(rbad?"warn-num":"")+"'>"+(kr.ratio5 > 0 ? n2(kr.ratio5)+" : 1" : "–")+"</b>"+
+           (rbad ? " <span class='warn-badge'>基準 "+stdR+" : 1 割れ</span>" : "")+" になります</p></div>";
     h += "</div>";
-    h += "<p class='hint' style='margin-top:8px'>どちらも上と同じ前提（収入横ばい・報酬改定は織り込まない）です。原資を増やして人数を保つか、原資を保って配置を薄くするかの二択を示します。</p>";
+    if (kr.breachYear){
+      h += "<p class='dwarn'>この人件費のままだと <b>"+kr.breachYear+"年後</b>に配置比率が基準 "+stdR+" : 1 を割ります（賃金を上げた分、置ける職員が減るため）。</p>";
+    }
+    h += "<p class='hint' style='margin-top:8px'>どちらも上と同じ前提（収入横ばい・報酬改定は織り込まない）です。原資を増やして人件費（人数）を保つか、人件費を保って配置を薄くするかの二択を示します。</p>";
   } else {
     h += "<p class='hint'>年間上昇率が 0.0％ のため推移は平坦です。2期分の決算から実績の伸び率を入れると動きます。</p>";
   }

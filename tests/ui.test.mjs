@@ -330,11 +330,34 @@ test("UI-15 同じジレンマの両面は g>0 でのみ表示され、値が状
   // g>0: 両側の見出しと値が出る。
   t.set("g", 2.5);
   assert.ok(trend().includes("同じジレンマの両面"), `g>0で両面が出ない`);
-  assert.ok(trend().includes("人数を保つ場合") && trend().includes("人件費率を保つ場合"), `両側の見出しがない`);
+  assert.ok(trend().includes("人数を保つ場合") && trend().includes("人件費を保つ場合"), `両側の見出しがない`);
   const c = stateOf(t), d = c.proj.dilemma;
   assert.ok(trend().includes(f1(d.keepRatio.n5) + " 人"), `職員数(5)=${f1(d.keepRatio.n5)} 人 が本文にない: ${trend()}`);
   assert.ok(trend().includes("収入横ばい"), `両面が前提（収入横ばい）の適用下にない`);
   // g を 0 に戻すと消える
   t.set("g", 0);
   assert.ok(!trend().includes("同じジレンマの両面"), `g=0に戻して両面が残っている`);
+});
+
+/* 水田さん指摘2: 「人件費を保つ場合」の配置比率が法令基準(3:1)を割るとき、朱色で明示する。
+   満たすときは警告を出さない。判定は法令基準に対してのみ（閾値は発明しない）。 */
+test("UI-16 人件費を保つ側が基準3:1を割ると朱色警告、満たすと出さない", () => {
+  const t = open();
+  // 特養デフォルト（3:1ちょうど）で g>0 → 人件費を保つと配置が薄くなり基準割れ
+  t.set("g", 2.5);
+  const c = stateOf(t);
+  assert.ok(c.proj.dilemma.keepRatio.breachYear, `前提: この構成で基準割れが起きる`);
+  assert.ok(t.txt("#trend").includes("基準 3 : 1 を割ります"), `基準割れの明示がない: ${t.txt("#trend")}`);
+  assert.ok(t.d.querySelector("#trend .dwarn"), `朱色の警告行(.dwarn)がない`);
+  assert.ok(t.d.querySelector("#trend .warn-badge"), `配置比率の基準割れバッジ(.warn-badge)がない`);
+  const yr = c.proj.dilemma.keepRatio.breachYear;
+  assert.ok(t.txt("#trend").includes(yr + "年後"), `何年後に割るかの明示がない（${yr}年後）`);
+
+  // 手厚い構成（介護を増員）＋小さめ g → 5年後も 3:1 を割らない → 警告を出さない
+  const t2 = open();
+  t2.row(0, "n", 60); t2.set("g", 0.5);
+  assert.ok(!stateOf(t2).proj.dilemma.keepRatio.breachYear, `前提: 手厚い構成では基準割れしない`);
+  assert.ok(!t2.txt("#trend").includes("を割ります"), `基準を満たすのに警告が出ている: ${t2.txt("#trend")}`);
+  assert.ok(!t2.d.querySelector("#trend .dwarn"), `満たすのに.dwarnがある`);
+  assert.ok(!t2.d.querySelector("#trend .warn-badge"), `満たすのに.warn-badgeがある`);
 });
