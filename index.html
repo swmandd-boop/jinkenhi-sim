@@ -220,7 +220,7 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
       <p class="chartnote" id="chartnote"></p>
       <svg id="chart" viewBox="0 0 640 400" role="img" aria-label="職員数と1人あたり給与費のトレードオフ曲線"></svg>
       <div class="legend">
-        <span id="lg-band"><i style="border-color:var(--take)"></i>基準内かつ賃金下限を満たす区間</span>
+        <span id="lg-band"><i style="border-color:var(--take)"></i>合計人数と賃金の目安（職種別は下の判定欄）</span>
         <span id="lg-dash"><i style="border-color:#9FB0BC;border-top-style:dashed"></i>同じ人件費で取り得る組み合わせ</span>
         <span id="lg-fill"><i class="sw"></i>基準を下回る領域（成立範囲の外）</span>
         <span><i style="border-color:var(--ai);border-top-style:dashed"></i>賃金下限</span>
@@ -1178,17 +1178,22 @@ function renderChartChrome(c){
       + "曲線は人件費総額÷職員数の双曲線（＝1人あたり給与費）。琥珀色の点を左右にドラッグすると介護・看護の人数だけが動き"
       + "（その他職員は固定）、手厚くするほど1人あたり給与費が下がります。左（薄い側）が基準割れです。"
       + "賃金下限は額面入力を事業主負担込み（×(1+法定福利費率)）に換算した位置に引きます。"
+      + "<b>緑の帯は合計人数と賃金の目安です。</b>職種ごとの過不足（介護・看護・その他）は帯では見ていないので、"
+      + "充足の可否は下の判定欄で確認してください。"
     : "横軸は職員数（常勤換算・正規＋非正規＋派遣）です。曲線は人件費総額÷職員数の双曲線（＝1人あたり給与費）。"
       + "琥珀色の点を左右にドラッグすると介護・看護の人数だけが動き（その他職員は固定）、人数を増やすほど1人あたり給与費が下がります。"
       + "<b>このサービスは対利用者の比率基準がない</b>ため、配置比率は表示しません"
       + "（人員基準は職種別に判定し、充足の可否は下の判定欄に出します）。"
       + "縦の基準線は<b>基準の単純合計（各職種の基準を足した人数）</b>の位置で、そこから左は基準を下回る領域です。"
-      + "賃金下限は額面入力を事業主負担込み（×(1+法定福利費率)）に換算した位置に引きます。";
+      + "賃金下限は額面入力を事業主負担込み（×(1+法定福利費率)）に換算した位置に引きます。"
+      + "<b>緑の帯は合計人数と賃金の目安です。</b>職種ごとの過不足（介護・看護・その他）は帯では見ていないので、"
+      + "充足の可否は下の判定欄で確認してください。";
   /* 凡例（2026-07-28 統一）。帯はどのサービスでも同じ意味なので同じ語。
      基準線は「配置比率の基準」と「人数の基準」で意味が違うので、同じ語のまま放置せず括弧で区別する。 */
   $("lg-base").hidden = false;
   $("lg-base").lastChild.textContent = withRatio ? "基準線（配置比率）" : "基準線（人数）";
-  $("lg-band").lastChild.textContent = "基準内かつ賃金下限を満たす区間";   // 意味は同じなのでサービスによらず同文
+  /* 帯は「合計人数と賃金」の目安であって職種別の充足判定ではない。名乗りを実態に合わせる。 */
+  $("lg-band").lastChild.textContent = "合計人数と賃金の目安（職種別は下の判定欄）";
   /* スライダーのラベル。比率基準があれば比率を主に、無ければ職員数を主にする。
      o-n は職種表の footer と同じ値（refreshTable が書く）。o-ratiobar は比率があるときだけ作る。 */
   $("scale-label").innerHTML = withRatio
@@ -1263,7 +1268,7 @@ function renderChart(c){
   /* ★等間隔サンプリングだけだと、条件が切り替わる境界（基準ちょうど・賃金下限ちょうど）が
      サンプル点に乗らず、帯の端が最大1サンプル分ずれる。基準ちょうどの配置（＝起動時の初期状態）で
      点が帯からわずかに外れて見えてしまうため、境界の n を明示的にサンプルへ加える。 */
-  var bounds = [c.nMinComp, (c.atgt > 0 ? c.total / c.floorA : null), nx.nbase];
+  var bounds = [(c.atgt > 0 ? c.total / c.floorA : null), nx.nbase];
   function seg(cond){
     var pts = [], i;
     for (i = 0; i <= 120; i++) pts.push(nx.nmin + (nx.nmax - nx.nmin)*i/120);
@@ -1283,22 +1288,35 @@ function renderChart(c){
     return d;
   }
   svg.appendChild(el("path",{d:seg(null),fill:"none",stroke:"#9FB0BC","stroke-width":1.5,"stroke-dasharray":"3 3"}));
-  /* 太実線＝「ここなら成立する」区間。**職種別の基準を満たす** かつ 賃金下限以上。
-     ★基準の判定には nMinComp（いまの職種構成のまま人数を増減させたとき、全職種が基準を
-       満たす最小の合計）を使う。合計の単純合計 stdN で切ると、caveat に書いた
-       「事務や調理を厚くすれば合計を満たしたまま介護・看護が基準を割る／合計の下限だけでは
-       判定できません」と矛盾する（合計は足りているのに職種別は未達、という構成で帯の内側に
-       入ってしまう）。nMinComp は職種別の判定を人数に翻訳した値なので caveat と一致する。
-     ★現在地では 充足 ⟺ n >= nMinComp が厳密に成り立つ（sMin<=1 ⟺ nMinComp<=fteAll）ので、
-       点が帯の内側かどうかと充足判定パネルの結論は必ず一致する。
-     ★比率基準のあるサービスは R <= 基準 を AND で残す（比率は法令上の必要条件のため）。
-     ★基準のある職種が0人（blocked）だと nMinComp=∞ になり、帯は出ない（正しい）。 */
+  /* 太実線＝「**合計人数と賃金**の目安」の区間。条件は
+       比率基準あり → 配置比率が基準以下（R <= 基準）
+       共通         → 職員数が基準の単純合計以上（n >= nbase）
+       共通         → 1人あたり給与費が賃金下限以上（A >= floorA）
+     ★帯は「合計」で切る。nMinComp（いまの構成で全職種が基準を満たす最小合計）で切ると
+       職種別と厳密に一致するが、**構成を変えるたびに帯そのものが伸び縮みする**。
+       道具としては帯が固定で、その中を点が動くほうが使いやすい（水田さん判断・I1撤回）。
+     ★その代わり、帯は職種別の過不足を見ていない。caveat に書いたとおり
+       「合計の下限だけでは判定できません」。この差は次の3つで開示する：
+         (1) 凡例を「合計人数と賃金の目安（職種別は下の判定欄）」に限定
+         (2) chartnote に同じ趣旨を明記
+         (3) 帯の内側なのに職種別が未達のときは、グラフ上に朱色で名指しする（下記 warnGap）
+       (3) があるので、矛盾が実際に起きた瞬間には画面が黙っていない。 */
   var okBand = seg(function(R, y, n){
     var inRatio = (nx.ax && nx.ax.base) ? (R != null && R <= nx.ax.base + 1e-9) : true;
-    var inStd   = isFinite(c.nMinComp) && n >= c.nMinComp - 1e-9;
+    var inStd   = (nx.nbase == null || n >= nx.nbase - 1e-9);   // 基準の単純合計（固定）
     return inRatio && inStd && (!(c.atgt > 0) || y >= c.floorA - 1e-9);
   });
   if (okBand) svg.appendChild(el("path",{d:okBand,fill:"none",stroke:"#2A7F72","stroke-width":4,"stroke-linecap":"round"}));
+  /* 帯は合計人数で切っているので、合計は足りていても職種別が未達のことがある
+     （事務や調理を厚くして介護・看護が基準を割る等）。その場合は帯の中に点があっても
+     「成立していない」ので、グラフ側でも名指しする（充足判定パネルと逆の合図を出さない）。 */
+  var pointInBand = (!(nx.ax && nx.ax.base) || (c.ratioActual != null && c.ratioActual <= nx.ax.base + 1e-9))
+                 && (nx.nbase == null || c.n >= nx.nbase - 1e-9)
+                 && (!(c.atgt > 0) || c.avg >= c.floorA - 1e-9);
+  if (pointInBand && (c.shorts.length || c.blocked)){
+    svg.appendChild(el("text",{x:VB.l+8,y:VB.t+PH-10,"font-size":11,fill:"#B23A2E","font-weight":"600","data-o":"gapwarn"},
+      "合計は足りていますが、職種別の基準を満たしていません（下の判定欄）"));
+  }
   else if (c.atgt > 0) svg.appendChild(el("text",{x:VB.l+PW/2,y:VB.t+PH/2,"text-anchor":"middle","font-size":13,fill:"#B23A2E","font-weight":"600"},"両立する区間なし"));
 
   /* 基準線（例: 3:1）＝対応する職員数の位置 */

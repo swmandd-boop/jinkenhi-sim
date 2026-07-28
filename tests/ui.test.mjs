@@ -743,7 +743,9 @@ test("AXB-09 凡例は、同じ意味の要素を同じ語で呼び、違う意�
   // 帯：どのサービスでも同じ意味 → 同じ語
   const bands = Object.values(facts).map(f => f.legendBand);
   assert.equal(new Set(bands).size, 1, `帯の凡例がサービスで違う: ${JSON.stringify(bands)}`);
-  assert.ok(bands[0].includes("基準内") && bands[0].includes("賃金下限"), `帯の凡例が意味を表していない: ${bands[0]}`);
+  /* 帯は「合計人数と賃金の目安」であって職種別の充足判定ではない（I1撤回で名乗りを実態に合わせた）。 */
+  assert.ok(bands[0].includes("合計人数") && bands[0].includes("判定欄"),
+    `帯の凡例が「合計の目安」であることと判定欄への誘導を表していない: ${bands[0]}`);
   // 基準線：意味が違う（配置比率の基準／人数の基準）→ 語を区別する
   assert.ok(facts.tsuusho.legendBase.includes("人数"), `通所の基準線の凡例が人数と分かる語でない: ${facts.tsuusho.legendBase}`);
   for (const svc of ["tokuyou", "unit", "roken"]) {
@@ -766,7 +768,14 @@ function bandRange(t) {
   const xs = (p.getAttribute("d").match(/[ML]([\d.]+)/g) || []).map(v => parseFloat(v.slice(1)));
   return xs.length ? { min: Math.min(...xs), max: Math.max(...xs) } : null;
 }
-test("AXB-10 点が緑の帯の内側かどうかと、充足判定パネルの結論が必ず一致する", () => {
+test("AXB-10 点が帯の内側かどうかは「合計人数と賃金」の条件と一致し、職種別の差は名指しされる", () => {
+  /* ★I1撤回（2026-07-28）にともなう契約の変更。
+     帯は nMinComp（構成依存）ではなく nbase（基準の単純合計・固定）で切るため、
+     「点が帯の内側 ⟺ 充足判定パネルの結論」は**もはや成り立たない**（合計は足りているが
+     職種別は未達、という構成が帯の内側に入る）。テストは削除せず、次の2つを固定する：
+       (a) 帯の内側かどうかが、帯が名乗っている条件（合計人数・賃金・比率）と厳密に一致すること
+       (b) 帯の内側なのに職種別が未達のときは、グラフ上で名指しすること
+           ＝画面が逆の合図を出したまま黙っていないこと（H1/I1 の再発防止はこちらが担う） */
   const cases = [
     ["tsuusho", "介護2.0/その他6.0（合計は基準以上・職種別は未達）", t => { t.row(0, "n", 2.0); t.row(2, "n", 6.0); }],
     ["tsuusho", "基準どおり（起動時＝境界）", () => {}],
@@ -787,12 +796,48 @@ test("AXB-10 点が緑の帯の内側かどうかと、充足判定パネルの�
     const c = stateOf(t);
     const b = bandRange(t), pt = t.d.querySelector('#chart [data-o="point"]');
     const px = pt ? parseFloat(pt.getAttribute("cx")) : null;
-    const compliant = t.txt("#compliance h3").includes("満たしています");
-    const wageOk = c.avg >= c.floorA - 1e-9;
-    const expect = compliant && wageOk;                  // 帯は「基準を満たす」かつ「賃金下限以上」
     const inBand = b != null && px != null && px >= b.min - 0.6 && px <= b.max + 0.6;
-    assert.equal(inBand, expect,
-      `[${svc}] ${label}: 充足=${compliant} 賃金OK=${wageOk} → 帯の内側であるべき=${expect} だが実際=${inBand}`);
+
+    // (a) 帯が名乗っている条件と一致する
+    const std = c.svc.ratio && c.svc.ratio.std;
+    const ratioOk = !std || (c.ratioActual != null && c.ratioActual <= std + 1e-9);
+    /* 帯の左端 nbase は、比率基準ありなら「基準比率に対応する職員数」＝利用者÷基準＋その他、
+       比率基準なしなら「基準の単純合計 stdN」。前者では n>=nbase は R<=基準 と同値になる。 */
+    const otherFte = c.fteAll - c.coreN;
+    const nbase = std ? (c.users / std + otherFte) : c.stdN;
+    const totalOk = c.n >= nbase - 1e-9;
+    const wageOk  = c.avg >= c.floorA - 1e-9;
+    assert.equal(inBand, ratioOk && totalOk && wageOk,
+      `[${svc}] ${label}: 帯の条件（比率${ratioOk}・合計${totalOk}・賃金${wageOk}）と 点が帯の内側=${inBand} が不一致`);
+
+    // (b) 帯の内側なのに職種別が未達なら、グラフ上で名指しする
+    const shortfall = !t.txt("#compliance h3").includes("満たしています");
+    const warn = t.d.querySelector('#chart [data-o="gapwarn"]');
+    if (inBand && shortfall) {
+      assert.ok(warn, `[${svc}] ${label}: 帯の内側なのに職種別が未達なのに、グラフが黙っている`);
+      assert.ok(warn.textContent.includes("判定欄"), `[${svc}] ${label}: 名指しに判定欄への誘導がない`);
+    } else {
+      assert.ok(!warn, `[${svc}] ${label}: 不要な名指しが出ている（帯内=${inBand} 未達=${shortfall}）`);
+    }
+  }
+});
+
+test("AXB-12 帯の左端はドラッグで動かない（帯は固定・その中を点が動く）", () => {
+  /* I1撤回の理由そのもの：nMinComp で切ると構成が変わるたびに帯が伸び縮みして道具として使いにくい。
+     nbase（基準の単純合計）は定員・稼働率だけで決まるので、ドラッグでは動かない。 */
+  for (const svc of ["tsuusho", "tokuyou", "unit", "roken"]) {
+    const t = open();
+    t.svc(svc);
+    t.set("atgt", 300);
+    const first = bandRange(t);
+    assert.ok(first, `${svc}: 帯が描かれていない`);
+    for (const f of [0, 0.3, 0.6, 1, 0.5, 0, 1]) {
+      slide(t, f);
+      const b = bandRange(t);
+      assert.ok(b, `${svc}: ドラッグ中に帯が消えた（f=${f}）`);
+      assert.ok(Math.abs(b.min - first.min) < 0.6,
+        `${svc}: 帯の左端がドラッグで動いた（f=${f}: ${b.min} ≠ ${first.min}）`);
+    }
   }
 });
 
