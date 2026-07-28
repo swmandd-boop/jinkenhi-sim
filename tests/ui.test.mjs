@@ -550,3 +550,37 @@ test("AXB-03 比率基準のあるサービスは従来表示を維持する", (
     assert.ok(t.txt("#ratiobar").includes(": 1"), `${svc}: 指標バーの比率セルが消えた`);
   }
 });
+
+/* ==== 公開版の文言（release-gate 第2回の指摘への対応・2026-07-28）====
+   ・記号「（A）」：A一本化で B を廃したため、対になる記号がなく定義もどこにもない → 画面から外す
+   ・免責一文：「個人情報を入力しないでください」（前回の公開明示文案から脱落していた）
+   ・問い合わせ導線：相談内容が伝わる文言に（リンク先は変更しない） */
+test("PUB-01 画面に記号「（A）」を出さない（A・B 2本立ての名残を残さない）", () => {
+  const t = open();
+  const body = t.d.body.textContent;
+  assert.ok(!body.includes("（A）"), `画面に「（A）」が残っている`);
+  assert.ok(!body.includes("（B）"), `画面に「（B）」が残っている`);
+  // 指標そのものの説明は残っていること（記号だけを外す）
+  assert.ok(body.includes("1人あたり給与費"), `1人あたり給与費の表記自体が消えている`);
+  assert.ok(t.txt(".caveat").includes("人件費総額 ÷ 職員数（正規＋非正規＋派遣）"), `定義の説明が消えている`);
+});
+
+test("PUB-02 免責一文に個人情報を入力しない旨がある", () => {
+  const t = open();
+  const dis = t.txt("footer.site-footer .disclaim");
+  assert.ok(dis.includes("個人情報は入力しないでください"), `免責に個人情報の注意がない: ${dis.slice(-120)}`);
+  assert.ok(dis.includes("送信されません"), `外部送信しない旨の補足がない`);
+  // 免責の他の趣旨も維持されていること（書き換えで落とさない）
+  assert.ok(dis.includes("指定権者の解釈を代替するものではありません"), `指定権者の趣旨が落ちている`);
+  assert.ok(dis.includes("判断そのものを行うものではありません"), `判断の材料である趣旨が落ちている`);
+  assert.ok(dis.includes("未検証のサンプル値"), `未検証サンプルの趣旨が落ちている`);
+});
+
+test("PUB-03 問い合わせ導線は相談内容が伝わる文言で、リンク先は変わらない", () => {
+  const t = open();
+  const a = t.d.querySelector("footer.site-footer .contact a");
+  assert.ok(a, `問い合わせリンクがない`);
+  assert.equal(a.getAttribute("href"), "https://forms.gle/nZd22V4geA5LAGVB8", `リンク先が変わっている`);
+  assert.equal(a.textContent.trim(), "この結果の読み解き、改善の方向性についてご相談いただけます");
+  assert.equal(a.getAttribute("rel"), "noopener", `rel=noopener が外れている`);
+});
