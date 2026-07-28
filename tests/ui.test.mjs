@@ -10,7 +10,7 @@ import { JSDOM } from "jsdom";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 function open() {
-  const dom = new JSDOM(readFileSync(resolve(root, "jinkenhi-sim.html"), "utf8"),
+  const dom = new JSDOM(readFileSync(resolve(root, "index.html"), "utf8"),
     { runScripts: "dangerously", pretendToBeVisual: true });
   const d = dom.window.document, Ev = dom.window.Event;
   const fire = (el, t) => el.dispatchEvent(new Ev(t, { bubbles: true }));
@@ -258,7 +258,7 @@ test("AXIS-01 横軸は人数に比例する（配置比率には比例しない
    親幅に追従し狭い幅では横スクロールする CSS 構成を固定する。実ピクセルの欠けなしは
    実機で確認）。table-layout:fixed + width:100% + min-width（狭幅でスクロール）。 */
 test("UI-12 職種別内訳テーブルは親幅に追従し、狭幅では横スクロールする構成である", () => {
-  const html = readFileSync(resolve(root, "jinkenhi-sim.html"), "utf8");
+  const html = readFileSync(resolve(root, "index.html"), "utf8");
   const css = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
   const tableRule = css.match(/(?:^|\})\s*table\{([^}]*)\}/)[1];
   assert.ok(/width:\s*100%/.test(tableRule), `table が width:100%（親幅追従）でない: ${tableRule}`);

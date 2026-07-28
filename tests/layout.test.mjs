@@ -15,7 +15,7 @@ import puppeteer from "puppeteer-core";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 /* 既定は本体HTML。LAYOUT_HTML で別ファイルを指すと、修正前コミットのHTMLに対して
    このテストが落ちることを（非破壊で）確認できる。 */
-const htmlPath = process.env.LAYOUT_HTML ? resolve(process.env.LAYOUT_HTML) : resolve(root, "jinkenhi-sim.html");
+const htmlPath = process.env.LAYOUT_HTML ? resolve(process.env.LAYOUT_HTML) : resolve(root, "index.html");
 const fileUrl = "file://" + htmlPath;
 
 function findChrome() {
@@ -109,4 +109,21 @@ test("LAYOUT-narrow 狭幅：切って隠さず、横スクロールで逃がす
   assert.equal(m.dcards.length, 2, `狭幅: ジレンマ両面カードが2枚でない（${m.dcards.length}）`);
   for (const d of m.dcards) assert.ok(d.over <= 1, `狭幅: 両面カードの文字が欠けている（超過 ${d.over}px）`);
   assert.ok(Math.abs(m.dcards[0].top - m.dcards[1].top) > 2, `狭幅: 両面カードが縦積みになっていない（横並びのまま）`);
+});
+
+/* スマホ実機（iPhone エミュレーション・touch）：職種表(min-width)がページ全体を広げず、本体が
+   device-width に収まること（body overflow-x:hidden の回帰ガード）。表は .tbl-scroll 内で横スクロール可。 */
+test("LAYOUT-mobile iPhone幅でページ本体が横に広がらない（表は内部スクロール）", async () => {
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  await page.goto(fileUrl, { waitUntil: "load" });
+  const m = await page.evaluate(() => {
+    const s = document.querySelector(".tbl-scroll");
+    return {
+      inner: window.innerWidth, pageScrollW: document.documentElement.scrollWidth,
+      tblContainer: s.clientWidth, tblScrollW: s.scrollWidth
+    };
+  });
+  assert.ok(m.pageScrollW <= m.inner + 1, `iPhone幅: ページ本体が横にはみ出している（scrollW ${m.pageScrollW} / inner ${m.inner}）`);
+  assert.ok(m.inner <= 391, `iPhone幅: 本体幅が device-width(390) を超えて広がっている（inner ${m.inner}）`);
+  assert.ok(m.tblScrollW > m.tblContainer + 1, `iPhone幅: 職種表が .tbl-scroll 内で横スクロールできない（切れて隠れている疑い）`);
 });

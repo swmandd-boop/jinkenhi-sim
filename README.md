@@ -6,8 +6,8 @@
 ## このリポジトリの構成
 
 ```
-jinkenhi-sim.html          本体。単一HTML・外部通信なし。これをそのまま公開する
-engine.mjs                 自動生成。編集しない（jinkenhi-sim.html から抜き出したもの）
+index.html                 本体。単一HTML・外部通信なし。これをそのまま公開する（URLは .../jinkenhi-sim/ で済む）
+engine.mjs                 自動生成。編集しない（index.html から抜き出したもの）
 tools/extract-engine.mjs   本体の ENGINE 区間を engine.mjs に抜き出す
 tools/dump-screen.mjs      画面の全表示値をテキストに書き出す（adversarial-review モード2用）
 tests/helpers.mjs          テスト用の入力生成とUI操作の再現

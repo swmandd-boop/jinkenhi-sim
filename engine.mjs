@@ -1,4 +1,4 @@
-/* 自動生成 — 直接編集しないこと。生成元: jinkenhi-sim.html */
+/* 自動生成 — 直接編集しないこと。生成元: index.html */
 /* ===== SWMD-ENGINE:BEGIN =====
    DOMに触れない純粋な計算層。tools/extract-engine.mjs がこの区間だけを
    engine.mjs として抜き出し、tests/ から import して検証する。

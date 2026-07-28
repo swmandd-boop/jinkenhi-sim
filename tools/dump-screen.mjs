@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const html = readFileSync(resolve(root, "jinkenhi-sim.html"), "utf8");
+const html = readFileSync(resolve(root, "index.html"), "utf8");
 const dom  = new JSDOM(html, { runScripts: "dangerously", pretendToBeVisual: true });
 const { document: d, Event } = dom.window;
 

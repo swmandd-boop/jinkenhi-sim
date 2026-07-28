@@ -13,7 +13,7 @@
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;overflow-x:hidden}   /* 職種表(min-width)以外はビューポート内に収まる。表は .tbl-scroll 内で横スクロール。狭幅で本体が横に広がらないように固定 */
 body{background:var(--paper);color:var(--ink);font-family:var(--gothic);font-size:15px;line-height:1.7;-webkit-text-size-adjust:100%}
 .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 72px}
 .masthead{border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:26px}
@@ -109,6 +109,11 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
 .caveat li{margin-bottom:3px}
 .copybox{width:100%;min-height:120px;font-family:var(--mono);font-size:12px;padding:10px;border:1px solid var(--rule);
   border-radius:2px;margin-top:10px;line-height:1.6;background:#fff;color:var(--ink)}
+.site-footer{margin-top:32px;padding-top:18px;border-top:1px solid var(--rule);color:var(--ink-2)}
+.site-footer .disclaim{font-size:12px;line-height:1.7;margin:0 0 12px;max-width:78ch}
+.site-footer .contact{margin:0 0 6px;font-size:13px}
+.site-footer .contact a{color:var(--ai);text-decoration:underline;font-weight:600}
+.site-footer .org{margin:0;font-size:11.5px;color:var(--ink-2);font-family:var(--mono)}
 @media print{body{background:#fff}.panel,.chartbox{border-color:#999}.ghost,.addrow,.del{display:none}}
 </style>
 </head>
@@ -336,6 +341,12 @@ input[type=range]{width:100%;accent-color:var(--kohaku)}
     </div>
   </div>
 </div>
+
+<footer class="site-footer">
+  <p class="disclaim">本ツールは福祉施設の人件費配分を検討するための参考シミュレーションです。初期値には未検証のサンプル値（収益・人件費総額・法定福利費率・賞与月数など）を含みます。配置基準の記載は主要職種の一般的な基準の要約で、加算要件・自治体の上乗せ条例・兼務・みなし配置・経過措置は反映しておらず、<b>指定権者の解釈を代替するものではありません</b>。本ツールは経営判断のための材料を示すもので、<b>判断そのものを行うものではありません</b>。実際の配置・賃金・収支は、決算書の実額と所轄庁の指導に基づいてご判断ください。</p>
+  <p class="contact"><a href="https://forms.gle/nZd22V4geA5LAGVB8" target="_blank" rel="noopener">コンサルティング・研修のご相談・お申し込み</a></p>
+  <p class="org">© 株式会社福祉マネジメント＆デザイン　人件費トレードオフ・シミュレーター v0.5</p>
+</footer>
 </div>
 
 <script>
