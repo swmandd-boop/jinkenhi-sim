@@ -1146,8 +1146,11 @@ function nAxis(c){
   }
   if (!(c.stdN > 0) || !(c.coreStd > 0)) return null;
   var otherStd = c.stdN - c.coreStd;                    // その他職員の基準（ドラッグで動かない）
+  /* 比率基準が無いサービスは、**基準の単純合計 stdN** の位置に人数ベースの基準マーカーを引く。
+     軸を基準より左へ広げた（核0.75倍）ので、境界が見えないと広げた意味が半減するため。
+     法令由来の値（各職種の基準の合計）で、閾値の発明ではない。 */
   return { ax:null, nmin: c.coreStd * CORE_LO + otherStd, nmax: c.coreStd * CORE_HI + otherStd,
-           nbase: null };
+           nbase: c.stdN };
 }
 function nFrac(nx, n){
   if (!nx || nx.nmax <= nx.nmin) return 0;
@@ -1174,10 +1177,11 @@ function renderChartChrome(c){
       + "賃金下限は額面入力を事業主負担込み（×(1+法定福利費率)）に換算した位置に引きます。"
     : "横軸は職員数（常勤換算・正規＋非正規＋派遣）です。曲線は人件費総額÷職員数の双曲線（＝1人あたり給与費）。"
       + "琥珀色の点を左右にドラッグすると介護・看護の人数だけが動き（その他職員は固定）、人数を増やすほど1人あたり給与費が下がります。"
-      + "<b>このサービスは対利用者の比率基準がない</b>ため、配置比率と基準線は表示しません"
+      + "<b>このサービスは対利用者の比率基準がない</b>ため、配置比率は表示しません"
       + "（人員基準は職種別に判定し、充足の可否は下の判定欄に出します）。"
+      + "縦の基準線は<b>基準の単純合計（各職種の基準を足した人数）</b>の位置で、そこから左は基準を下回る領域です。"
       + "賃金下限は額面入力を事業主負担込み（×(1+法定福利費率)）に換算した位置に引きます。";
-  $("lg-base").hidden = !withRatio;                       // 引けない基準線は凡例からも消す
+  $("lg-base").hidden = false;                            // 比率基準あり＝比率の基準線／なし＝人数の基準マーカー
   $("lg-band").lastChild.textContent = withRatio ? "基準内かつ賃金下限を満たす区間" : "賃金下限を満たす区間";
   /* スライダーのラベル。比率基準があれば比率を主に、無ければ職員数を主にする。
      o-n は職種表の footer と同じ値（refreshTable が書く）。o-ratiobar は比率があるときだけ作る。 */
@@ -1272,8 +1276,10 @@ function renderChart(c){
   /* 基準線（例: 3:1）＝対応する職員数の位置 */
   if (nx.nbase != null && nx.nbase > nx.nmin && nx.nbase < nx.nmax){
     var xB = X(nx.nbase);
-    svg.appendChild(el("line",{x1:xB,x2:xB,y1:VB.t,y2:VB.t+PH,stroke:"#B23A2E","stroke-width":1.4,"stroke-dasharray":"6 4"}));
-    svg.appendChild(el("text",{x:xB+5,y:VB.t+12,"font-size":10.5,fill:"#B23A2E"},"基準 "+nx.ax.base+" : 1"));
+    svg.appendChild(el("line",{x1:xB,x2:xB,y1:VB.t,y2:VB.t+PH,stroke:"#B23A2E","stroke-width":1.4,"stroke-dasharray":"6 4","data-o":"basemark"}));
+    /* 比率基準あり＝配置比率の基準線（「基準 3 : 1」）。無し＝人数ベースの基準マーカー（「基準 8.1人」）。 */
+    svg.appendChild(el("text",{x:xB+5,y:VB.t+12,"font-size":10.5,fill:"#B23A2E","data-o":"baselabel"},
+      nx.ax ? "基準 "+nx.ax.base+" : 1" : "基準 "+n1(nx.nbase)+"人"));
   }
   /* 賃金下限（横線）＝額面入力を事業主負担込み floorA に換算した位置。ラベルは両方を併記して誤読を防ぐ。 */
   if (c.atgt > 0 && c.floorA < ymax){

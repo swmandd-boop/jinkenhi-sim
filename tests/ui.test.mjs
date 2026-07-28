@@ -491,6 +491,8 @@ function chartFacts(t) {
     ratioTicks: d.querySelectorAll('#chart [data-rt]').length,
     headTicks:  d.querySelectorAll('#chart [data-nt]').length,
     baseLines:  [...d.querySelectorAll("#chart line")].filter(e => e.getAttribute("stroke") === "#B23A2E").length,
+    baseLabel:  (d.querySelector('#chart [data-o="baselabel"]') || {}).textContent || "",
+    baseMarkX:  (() => { const e = d.querySelector('#chart [data-o="basemark"]'); return e ? parseFloat(e.getAttribute("x1")) : null; })(),
     legendBaseHidden: d.getElementById("lg-base").hidden,
     note:  d.getElementById("chartnote").textContent,
     label: d.getElementById("scale-label").textContent.replace(/\s+/g, " ").trim()
@@ -503,8 +505,10 @@ test("AXB-01 通所介護では比率目盛り・基準線・凡例の基準線�
   const f = chartFacts(t);
   assert.equal(f.ratioTicks, 0, `通所で上段の比率目盛りが出ている（${f.ratioTicks}件）`);
   assert.ok(f.headTicks >= 3, `通所で常勤換算数の目盛りが出ていない（${f.headTicks}件）`);
-  assert.equal(f.baseLines, 0, `通所で基準線が描かれている（${f.baseLines}本）`);
-  assert.equal(f.legendBaseHidden, true, `通所で凡例の「基準線」が残っている`);
+  /* 2026-07-28: 通所にも**人数ベースの基準マーカー**（基準の単純合計の位置）を引くようにしたため、
+     「基準線が0本」ではなく「**比率**の基準線ではないこと」を固定する。 */
+  assert.ok(!/[\d.]+\s*:\s*1/.test(f.baseLabel), `通所の基準ラベルが比率になっている: ${f.baseLabel}`);
+  assert.equal(f.legendBaseHidden, false, `通所で凡例の基準線が消えている（人数マーカーを引くので出す）`);
   assert.ok(!f.label.includes("配置比率"), `通所のスライダーが比率ラベルのまま: ${f.label}`);
   assert.ok(f.label.includes("職員数"), `通所のスライダーが職員数主表示でない: ${f.label}`);
   assert.ok(!f.note.includes("基準割れ"), `通所の説明に「基準割れ」が残っている`);
@@ -635,4 +639,55 @@ test("AXB-04 通所の軸は基準を割る領域まで見え、左端でも核�
   slide(u, 1); const uhi = stateOf(u);
   assert.ok(Math.abs(ulo.coreN / cu.coreStd - 0.75) < 1e-6, `特養の左端の核倍率が0.75でない: ${ulo.coreN / cu.coreStd}`);
   assert.ok(Math.abs(uhi.coreN / cu.coreStd - 3) < 1e-6, `特養の右端の核倍率が3でない: ${uhi.coreN / cu.coreStd}`);
+});
+
+/* AXB-05（2026-07-28）: 比率基準の無いサービス（通所）に、人数ベースの基準マーカーを引く。
+   軸を基準より左へ広げた（核0.75倍）ため、境界が見えないと広げた意味が半減する。
+   位置は「基準の単純合計（各職種の基準の合計）」＝法令由来の値で、閾値の発明ではない。
+   特養系は既存の比率基準線があるため人数マーカーは追加しない（重複を避ける）。 */
+test("AXB-05 通所に人数ベースの基準マーカーが基準の単純合計の位置に出る", () => {
+  const VBl = 64, PW = 640 - 64 - 22;
+  const t = open();
+  t.svc("tsuusho");
+  const c = stateOf(t);
+  const f = chartFacts(t);
+  // ラベルは「基準 8.1人」形式（比率ではない）
+  assert.ok(f.baseLabel.includes("基準") && f.baseLabel.includes("人"), `基準マーカーのラベルがない: ${f.baseLabel}`);
+  assert.ok(f.baseLabel.includes((Math.round(c.stdN * 10) / 10).toFixed(1)),
+    `ラベルが基準の単純合計 ${c.stdN} を示していない: ${f.baseLabel}`);
+  // 位置が基準の単純合計に対応する（軸域から逆算した割合と一致）
+  const E = t.d.defaultView.ENGINE;
+  const coreStd = c.coreStd, otherStd = c.stdN - c.coreStd;
+  const nmin = coreStd * 0.75 + otherStd, nmax = coreStd * 3 + otherStd;
+  const expectX = VBl + (c.stdN - nmin) / (nmax - nmin) * PW;
+  assert.ok(f.baseMarkX != null, `基準マーカーの線が描かれていない`);
+  assert.ok(Math.abs(f.baseMarkX - expectX) < 0.6,
+    `基準マーカーの位置がずれている: ${f.baseMarkX} 期待 ${expectX}`);
+  // 基準より左（薄い側）にいる＝マーカーは現在地より右か左かが分かる位置にある
+  assert.ok(f.baseMarkX > VBl && f.baseMarkX < VBl + PW, `基準マーカーが軸の外にある: ${f.baseMarkX}`);
+
+  // 軸域が変わっても（定員・稼働率を変える）マーカーは基準の単純合計に追従する
+  t.set("sz-cap", 60);
+  const c2 = stateOf(t), f2 = chartFacts(t);
+  assert.ok(c2.stdN !== c.stdN, `前提: 定員変更で基準の単純合計が変わる`);
+  const core2 = c2.coreStd, other2 = c2.stdN - c2.coreStd;
+  const expectX2 = VBl + (c2.stdN - (core2 * 0.75 + other2)) / ((core2 * 3 + other2) - (core2 * 0.75 + other2)) * PW;
+  assert.ok(Math.abs(f2.baseMarkX - expectX2) < 0.6, `軸域変更後にマーカーが追従していない: ${f2.baseMarkX} 期待 ${expectX2}`);
+  assert.ok(f2.baseLabel.includes((Math.round(c2.stdN * 10) / 10).toFixed(1)), `ラベルが更新されていない: ${f2.baseLabel}`);
+
+  // ドラッグしてもマーカーは動かない（基準は実配置に依存しない）
+  const before = chartFacts(t).baseMarkX;
+  slide(t, 0); slide(t, 1); slide(t, 0.5);
+  assert.ok(Math.abs(chartFacts(t).baseMarkX - before) < 1e-6, `ドラッグで基準マーカーが動いた`);
+});
+
+test("AXB-06 特養系には人数マーカーを足さず、比率の基準線のままにする", () => {
+  for (const svc of ["tokuyou", "unit", "roken"]) {
+    const t = open();
+    t.svc(svc);
+    const f = chartFacts(t);
+    assert.ok(/[\d.]+\s*:\s*1/.test(f.baseLabel), `${svc}: 基準ラベルが比率でない: ${f.baseLabel}`);
+    assert.ok(!f.baseLabel.includes("人"), `${svc}: 人数マーカーが混ざっている: ${f.baseLabel}`);
+    assert.equal(f.baseLines, 1, `${svc}: 基準の縦線が1本でない（${f.baseLines}本）＝重複して引かれている`);
+  }
 });
