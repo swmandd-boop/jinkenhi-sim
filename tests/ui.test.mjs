@@ -288,3 +288,32 @@ test("UI-09 必要人件費率は下回れない平均年収の入力前は数�
   assert.ok(needHasNumber(), `atgt入力後に必要人件費率の数値が出ていない: ${need()}`);
   assert.equal(needHasNumber(), anchorHasWage(), `§5と§6の表示条件が不一致（入力後）: need=${needHasNumber()} anchor=${anchorHasWage()}`);
 });
+
+/* 段3後 修正1: その他職員の不足メッセージに基準の内訳を出す。入力は3行のままで、
+   メッセージにエンジンが持つ基準の内訳（施設長・医師・生活相談員…）と合計・入力を併記する。 */
+test("UI-13 不足メッセージにその他職員の基準内訳が出る", () => {
+  const t = open();
+  t.set("sz-cap", 125);                 // 定員125へ（構成据え置き＝その他が基準割れ）
+  const html = t.txt("#compliance");
+  assert.ok(html.includes("その他職員"), `その他職員の不足が出ていない: ${html}`);
+  assert.ok(html.includes("基準の内訳"), `基準の内訳が出ていない: ${html}`);
+  // 内訳の職種名（エンジンの note 由来）が含まれる
+  for (const role of ["施設長", "医師", "生活相談員", "機能訓練指導員", "介護支援専門員", "管理栄養士"]) {
+    assert.ok(html.includes(role), `内訳に「${role}」がない: ${html}`);
+  }
+  assert.ok(html.includes("入力"), `入力人数の併記がない: ${html}`);
+});
+
+/* 段3後 修正2: 基準未達のとき §6 の配置側（配置の余裕）を出さず、充足判定パネルに任せる。
+   充足しているとき（余裕が正・ゼロ）だけ「配置の余裕：＋◯人」を出す。「余裕−◯人」は出さない。 */
+test("UI-14 §6 配置の余裕は基準未達では出さず、充足時のみ出す", () => {
+  const t = open();
+  const anchor = () => t.txt("#anchor");
+  t.set("sz-cap", 125);                 // 未達を作る
+  assert.ok(t.txt("#compliance").includes("下回っています"), `前提: 未達になっていない`);
+  assert.ok(!anchor().includes("配置の余裕"), `未達なのに配置の余裕が出ている: ${anchor()}`);
+  assert.ok(!anchor().includes("−"), `未達で「−◯人」の表現が残っている: ${anchor()}`);
+  t.click("fill-std");                  // 不足を埋めて充足へ
+  assert.ok(t.txt("#compliance").includes("満たしています"), `前提: 充足になっていない`);
+  assert.ok(anchor().includes("配置の余裕"), `充足時に配置の余裕が出ていない: ${anchor()}`);
+});

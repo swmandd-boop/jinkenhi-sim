@@ -188,7 +188,7 @@ var SERVICES = {
     var sMin = 0, blocked = null, shorts = [];
     rows.forEach(function(r){
       if (!r.std || r.std <= 0) return;
-      if (r.totalFte < r.std - 1e-9) shorts.push({ name:r.name, gap:r.std - r.totalFte });
+      if (r.totalFte < r.std - 1e-9) shorts.push({ name:r.name, gap:r.std - r.totalFte, note:r.note, std:r.std, have:r.totalFte });
       var tot = r.n + r.hi + r.haken;
       if (tot <= 0){ blocked = r.name; return; }
       var need = r.std / tot;

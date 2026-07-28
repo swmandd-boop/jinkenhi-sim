@@ -520,7 +520,7 @@ var SERVICES = {
     var sMin = 0, blocked = null, shorts = [];
     rows.forEach(function(r){
       if (!r.std || r.std <= 0) return;
-      if (r.totalFte < r.std - 1e-9) shorts.push({ name:r.name, gap:r.std - r.totalFte });
+      if (r.totalFte < r.std - 1e-9) shorts.push({ name:r.name, gap:r.std - r.totalFte, note:r.note, std:r.std, have:r.totalFte });
       var tot = r.n + r.hi + r.haken;
       if (tot <= 0){ blocked = r.name; return; }
       var need = r.std / tot;
@@ -850,7 +850,14 @@ function renderCompliance(c){
     box.className = "verdict no";
     h += "<h3>職種別の基準を下回っています</h3>";
     h += "<p>合計人数が足りていても、職種別の基準は別に満たす必要があります。不足しているのは次の職種です。</p><ul>";
-    c.shorts.forEach(function(x){ h += "<li>" + x.name + "：<b class='num'>" + n1(x.gap) + "</b> 人 不足</li>"; });
+    c.shorts.forEach(function(x){
+      h += "<li>" + x.name + "：<b class='num'>" + n1(x.gap) + "</b> 人 不足";
+      if (x.note){
+        h += "<div class='hint' style='margin:2px 0 0'>基準の内訳：" + x.note.replace(/\s*の合計$/, "") +
+             " ＝ " + n1(x.std) + " 人（入力 " + n1(x.have) + " 人）</div>";
+      }
+      h += "</li>";
+    });
     h += "</ul><p>いまの構成のまま満たすなら合計 <b class='num'>" + n1(c.nMinComp) +
          "</b> 人まで増やすか、下の「不足職種を基準まで埋める」で構成を直します。</p>";
   } else {
@@ -931,8 +938,12 @@ function renderAnchor(c){
   box.hidden = false;
   var sN = c.slackN, tight = Math.abs(sN) < 0.5;
   var h = "<h3>いまの置き方の位置づけ</h3>";
-  h += "<p>配置の余裕：<b class='num'>" + (sN >= 0 ? "＋" : "−") + n1(Math.abs(sN)) +
-       "</b> 人（職種別基準を満たす最小 " + n1(c.nMinComp) + " 人に対して）</p>";
+  /* 配置の余裕は「基準を満たしている（余裕が正・ゼロ）」ときだけ出す。未達（余裕が負）のときは
+     充足判定パネルが「あと何人・どの職種が不足か」を出すので、ここで抽象的に繰り返さない。 */
+  if (sN >= -1e-9){
+    h += "<p>配置の余裕：<b class='num'>＋" + n1(sN) +
+         "</b> 人（職種別基準を満たす最小 " + n1(c.nMinComp) + " 人に対して）</p>";
+  }
   if (atgtTouched){
     h += "<p>賃金の余裕：<b class='num'>×" + c.slackWage.toFixed(2) +
          "</b>（下回れない平均年収 " + n1(c.atgt) + " 万円に対する平均年収 " + n1(c.avg) + " 万円）</p>";
