@@ -365,6 +365,9 @@ var W = {
 };
 var CEIL = function(v){ return Math.ceil(v - 1e-9); };
 var R1   = function(v){ return Math.round(v * 10) / 10; };  // 基準を0.1単位に丸める（初期の基準合計＝正規合計を厳密一致させるため）
+/* 核（介護・看護）の常勤換算がこれ以下なら「配置比率は定義できない」として扱う。
+   0.05人＝表示単位(0.1)の半分。極小値での割り算（利用者÷1e-9＝天文学的な比率）を断つ。 */
+var CORE_EPS = 0.05;
 
 /* =========================================================
    サービス種別プリセット
@@ -553,15 +556,20 @@ var SERVICES = {
     /* 配置比率（雇用形態を問わず合計で数える）。coreN は核職種（介護・看護）の常勤換算合計
        （派遣込み）。coreStaff は核の職員分（派遣を除く正規＋非正規）で、配置比率を動かしたとき
        Bの分母（職員数）がどう動くかを出すのに使う（§3/§4）。 */
-    var coreN = 0;
+    var coreN = 0, coreStd = 0;
     if (svc.ratio) rows.forEach(function(r){
-      if (svc.ratio.roles.indexOf(r.key) >= 0){ coreN += r.totalFte; }
+      if (svc.ratio.roles.indexOf(r.key) >= 0){ coreN += r.totalFte; coreStd += (r.std || 0); }
     });
     var otherFte = fteAll - coreN;   // その他職員の常勤換算（派遣込み・配置比率ドラッグで固定）
-    var ratioActual = (coreN > 0 && users > 0)
-      ? (svc.ratio && svc.ratio.invert ? users / coreN : users / coreN) : 0;
+    /* 配置比率は「核（介護・看護）が0」「利用者0」のとき定義できない。0 を返すと画面に
+       「0.00 : 1」と出て誤読を招き、割り算側では 利用者÷0 が発散する。定義できないときは
+       null を返し、画面は「–」を出す（数値として出さない）。 */
+    var ratioActual = (coreN > CORE_EPS && users > 0) ? users / coreN : null;
+    /* 基準配置での配置比率（現在の入力に依存しない固定アンカー）。グラフの軸域はこれを基準に
+       とるので、ドラッグしても軸が動かない（軸が現在値に追従すると端で発散する）。 */
+    var ratioStd = (coreStd > CORE_EPS && users > 0) ? users / coreStd : null;
     var ratioBad = !!(svc.ratio && svc.ratio.std && !svc.ratio.invert
-                      && coreN > 0 && ratioActual > svc.ratio.std + 1e-9);
+                      && ratioActual != null && ratioActual > svc.ratio.std + 1e-9);
 
     /* 成立判定。賃金下限は額面入力 atgt を A軸（事業主負担込み）に換算した floorA で判定する。
        nCap＝賃金下限を守って雇える職員数(fteAll)の上限＝人件費総額 ÷ floorA（曲線 A=total/n が floorA を切る点）。 */
@@ -608,10 +616,12 @@ var SERVICES = {
     /* 人件費を保つ側は人件費総額一定で賃金だけ上がり、職員（＝配置）が減る。配置比率が法令基準（3:1 等）を
        割る年を出す。判定は svc.ratio.std がある場合のみ（法令基準に対してのみ・閾値は発明しない）。 */
     var stdR = (svc.ratio && svc.ratio.std) ? svc.ratio.std : null;
-    function ratioAtY(t){ var nt = n / grow(t), cr = nt - otherFte; return (users > 0 && cr > 0) ? users / cr : 0; }
-    var r3 = ratioAtY(3), r5 = (users > 0 && core5 > 0) ? users / core5 : 0;
+    /* 核が CORE_EPS 以下まで痩せる年次は比率を定義しない（null）。0 を返すと「0.00 : 1」と
+       出てしまい、極小値だと天文学的な比率になる。 */
+    function ratioAtY(t){ var nt = n / grow(t), cr = nt - otherFte; return (users > 0 && cr > CORE_EPS) ? users / cr : null; }
+    var r3 = ratioAtY(3), r5 = (users > 0 && core5 > CORE_EPS) ? users / core5 : null;
     var breachYear = null;
-    if (stdR){ if (r3 > stdR + 1e-9) breachYear = 3; else if (r5 > stdR + 1e-9) breachYear = 5; }
+    if (stdR){ if (r3 != null && r3 > stdR + 1e-9) breachYear = 3; else if (r5 != null && r5 > stdR + 1e-9) breachYear = 5; }
     proj.dilemma = {
       t: 5,
       keepStaff: { ratio: effRatio * fD, ratioNow: effRatio, deltaTotal: total * (fD - 1), totalNew: total * fD },
@@ -619,7 +629,7 @@ var SERVICES = {
         nNow: n, n5: n5, ratioNow: ratioActual,
         ratio3: r3, ratio5: r5,
         std: stdR, breachYear: breachYear,
-        ratio5Bad: !!(stdR && r5 > stdR + 1e-9)
+        ratio5Bad: !!(stdR && r5 != null && r5 > stdR + 1e-9)
       }
     };
 
@@ -647,8 +657,8 @@ var SERVICES = {
       sMin:sMin, nMinComp:nMinComp, shorts:shorts, blocked:blocked, nmin:nmin,
       slackN: (isFinite(nMinComp) ? n - nMinComp : Infinity),  // 配置の余裕（人・fteAll基準）
       slackWage: (I.atgt > 0 ? avg / floorA : Infinity),        // 賃金の余裕（A ÷ 賃金下限(事業主負担込み)）
-      users:users, coreN:coreN, otherFte:otherFte,
-      ratioActual:ratioActual, ratioBad:ratioBad,
+      users:users, coreN:coreN, coreStd:coreStd, otherFte:otherFte,
+      ratioActual:ratioActual, ratioStd:ratioStd, ratioBad:ratioBad,
       nCap:nCap, feasible:feasible,
       okN: n >= nmin - 1e-9, okA: avg >= floorA - 1e-9,
       needTotal:needTotal, gap: needTotal - total,
@@ -697,6 +707,9 @@ var SERVICES = {
     rows.forEach(function(r){
       if (roles.indexOf(r.key) >= 0) curCore += (r.n || 0) + (r.hi || 0) + (r.haken || 0);
     });
+    /* R が非有限（＝比率が定義できない位置）なら按分しない。素通しすると核が0になり、
+       0からは二度と比例配分で戻せない（0×係数=0）ため、そこで操作不能に陥る。 */
+    if (!isFinite(R) || !(R > 0)) R = 0;
     var f = (curCore > 0 && users > 0 && R > 0) ? (users / R) / curCore : 1;
     return rows.map(function(r){
       var o = {}; for (var k in r) o[k] = r[k];
@@ -711,7 +724,7 @@ var SERVICES = {
      常勤換算 otherFte（派遣込み）は核ドラッグで固定なので fteAll(R) = users/R + otherFte。
      v0.5: 指標を A に一本化したため、職員数は派遣込み(fteAll)で数える。 */
   function fteAllAtRatio(c, R){
-    if (!(R > 0) || !(c.coreN > 0)) return c.fteAll;
+    if (!isFinite(R) || !(R > 0) || !(c.coreN > CORE_EPS)) return c.fteAll;
     return c.users / R + (c.fteAll - c.coreN);
   }
   /* 配置比率 R のときの 1人あたり給与費 A ＝ 人件費総額 ÷ 職員数(R)。 */
@@ -721,9 +734,11 @@ var SERVICES = {
      n = users/R + otherFte なので R = users/(n − otherFte)。つまみ／ドラッグの目標人数 n を
      配置比率へ戻して核だけ按分するのに使う。 */
   function ratioAtFteAll(c, n){
-    if (!(c.coreN > 0)) return (c.svc.ratio && c.svc.ratio.std) ? c.svc.ratio.std : 1;
-    var other = c.fteAll - c.coreN;
-    return ((n - other) > 0) ? c.users / (n - other) : Infinity;
+    if (!(c.coreN > CORE_EPS) || !(c.users > 0)) return null;
+    var other = c.fteAll - c.coreN, core = n - other;
+    /* 核が CORE_EPS 以下になる位置は比率を定義しない（null）。Infinity を返すと呼び出し側で
+       users/∞=0 となり核が全員0に潰れ、そこから戻せなくなる。 */
+    return (core > CORE_EPS) ? c.users / core : null;
   }
 
   return { W:W, SERVICES:SERVICES, buildStandard:buildStandard,
@@ -748,13 +763,14 @@ var scale = 1, sizes = {}, rows = [];
 var $ = function(id){ return document.getElementById(id); };
 var num = function(id){ var v = parseFloat($(id).value); return isFinite(v) ? v : 0; };
 function man(v){ return v.toLocaleString("ja-JP",{maximumFractionDigits:0}) + " 万円"; }
-function n1(v){ return (Math.round(v*10)/10).toLocaleString("ja-JP",{minimumFractionDigits:1,maximumFractionDigits:1}); }
+function n1(v){ return (v == null || !isFinite(v)) ? "–" : (Math.round(v*10)/10).toLocaleString("ja-JP",{minimumFractionDigits:1,maximumFractionDigits:1}); }
 /* 入力欄の表示用。スライダー確定（比例配分）で生じる満精度の値を、合計列（n1・0.1単位）と
    同じ 0.1 単位に丸めて短く・欠けずに表示する。実配置 rows 自体は満精度のまま保持するので
    職種構成比・nMinComp は厳密に保たれる（これは value 文字列の見た目だけを整える）。
    カンマ区切りは number 入力に入れられないため使わない。 */
 function fmtN(v){ return String(Math.round((v || 0) * 10) / 10); }
-function n2(v){ return (Math.round(v*100)/100).toFixed(2); }
+/* 定義できない量（配置比率など）は null で来る。数値化せず「–」を返す（NaN や 0.00 を出さない）。 */
+function n2(v){ return (v == null || !isFinite(v)) ? "–" : (Math.round(v*100)/100).toFixed(2); }
 function yen(v){ return Math.round(v).toLocaleString("ja-JP") + " 円"; }
 function pct(v){ return v.toFixed(1) + " ％"; }
 
@@ -862,7 +878,7 @@ function renderRatio(c){
            '</span><span class="s">万円　人件費総額÷（正規＋非正規＋派遣）・事業主負担込み'+avgNote+'</span></div>';
   cells += '<div class="cell"><span class="k">正規比率</span><span class="v">'+c.regRatio.toFixed(1)+
            ' ％</span><span class="s">職員ベース（非正規 '+n1(c.nHi)+'／派遣 '+n1(c.nHk)+' 人）</span></div>';
-  if (r && c.coreN > 0 && c.users > 0){
+  if (r && c.ratioActual != null){   // 核0・利用者0 では比率を定義できないのでセル自体を出さない
     if (r.invert){
       cells += '<div class="cell"><span class="k">'+r.label+'</span><span class="v">'+n1(c.ratioActual)+
                '</span><span class="s">人／職員1人（常勤換算 '+n1(c.coreN)+' 人）</span></div>';
@@ -1083,8 +1099,13 @@ function ratioAxis(c){
   if (!r) return null;
   var base = r.std || null;
   if (base) return { rmax: base + 1, rmin: 1.0, base: base };
-  var Rc = (c.ratioActual > 0) ? c.ratioActual : 3;
-  return { rmax: Math.max(Rc * 1.4, Rc + 1), rmin: Math.max(0.5, Rc * 0.6), base: null };
+  /* 比率基準の無いサービス（通所）は軸域を「基準配置での比率 ratioStd」に固定する。
+     ★現在の比率 ratioActual から軸域を作ると、端まで動かすたびに軸が追従して広がり、
+       薄い側の端が発散する（核→0、比率が 6.9e18 等になり描画が壊れる）。軸は現在値に
+       依存させない。ratioStd が取れない（核の基準0・利用者0）ときは軸を作らない。 */
+  var Rs = c.ratioStd;
+  if (!(Rs > 0) || !isFinite(Rs)) return null;
+  return { rmax: Rs * 1.4, rmin: Math.max(0.5, Rs * 0.6), base: null };
 }
 /* 人数空間の軸（段階2追）: 配置比率 rmax..rmin に対応する職員数 n を左右端にとる。
    薄い側(rmax)=小さいn=左、手厚い側(rmin)=大きいn=右。基準線は基準比率に対応する n。
@@ -1116,7 +1137,17 @@ function renderChart(c){
   var svg = $("chart");
   while (svg.firstChild) svg.removeChild(svg.firstChild);
   var nx = nAxis(c), PW = VB.w-VB.l-VB.r, PH = VB.h-VB.t-VB.b;
-  if (!nx || !(c.total > 0) || !(nx.nmax > nx.nmin)){ view = null; return; }
+  /* 軸が作れない条件（利用者0＝定員か稼働率が0／介護・看護が0／人件費0）では描かない。
+     無言で空にせず、なぜ描けないかを1行出す（黒画面・NaN目盛りを出さないためのガード）。 */
+  if (!nx || !(c.total > 0) || !(nx.nmax > nx.nmin)){
+    view = null;
+    var why = !(c.users > 0) ? "定員と稼働率を入れると曲線が出ます。"
+            : !(c.coreN > 0) ? "介護・看護職員を入れると曲線が出ます（配置比率が定義できません）。"
+            : !(c.total > 0) ? "人件費総額を入れると曲線が出ます。"
+            : "この条件では曲線を描けません。";
+    svg.appendChild(el("text",{x:VB.w/2,y:VB.h/2,"text-anchor":"middle","font-size":13,fill:"#5A6B78","data-o":"nochart"}, why));
+    return;
+  }
   view = { nx:nx, PW:PW };
   /* 横軸＝職員数 n（正規＋非正規＋派遣＝fteAll）。曲線は 人件費総額÷n の双曲線（＝1人あたり給与費A）。
      左端(nmin)で A 最大。賃金下限は額面入力を事業主負担込み floorA に換算した位置に引く。 */
@@ -1216,7 +1247,8 @@ function makeText(c){
   L.push("雇用区分：正規 " + n1(c.nSe) + " 人／非正規 " + n1(c.nHi) + " 人／派遣 " + n1(c.nHk) + " 人（正規比率 " + c.regRatio.toFixed(1) + "％）");
   if (c.nHk > 0) L.push("　派遣費用 " + man(c.hakenFee) + "（1人あたり費用 " + n1(c.hakenUnit) + " 万・賃金ではなく委託費用）");
   if (c.svc.ratio && c.coreN > 0 && c.users > 0){
-    L.push(c.svc.ratio.label + "：" + (c.svc.ratio.invert ? n1(c.ratioActual) + " 人／職員1人" : n2(c.ratioActual) + " : 1")
+    L.push(c.svc.ratio.label + "：" + (c.ratioActual == null ? "－（介護・看護が0のため算出不能）"
+      : (c.svc.ratio.invert ? n1(c.ratioActual) + " 人／職員1人" : n2(c.ratioActual) + " : 1"))
       + (c.ratioBad ? "　※基準未達" : ""));
   }
   L.push("");
@@ -1251,6 +1283,8 @@ window.__SWMD_STATE = function(){ return last; };
 function foldCoreTo(R){
   var roles = (last && last.svc.ratio) ? last.svc.ratio.roles : [];
   var users = last ? last.users : 0;
+  /* R が null/非有限（＝比率が定義できない位置）なら何もしない。核を0に潰さないための門番。 */
+  if (R == null || !isFinite(R) || !(R > 0)){ update(); return; }
   if (roles.length && users > 0 && R > 0){
     rows = ENGINE.scaleCoreToRatio(rows, roles, users, R);
     buildTable();

@@ -398,3 +398,86 @@ test("UI-18 賃金下限の線は 額面×(1+法定福利費率) の位置（ラ
   assert.ok(wlabel && wlabel.includes("440") && wlabel.includes("事業主負担込み") && wlabel.includes(f1floor(floorA)), `ラベルに額面と事業主負担込みの併記がない: ${wlabel}`);
   function f1floor(v){ return (Math.round(v * 10) / 10).toLocaleString("ja-JP", { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
 });
+
+/* ==== ゼロ除算・端点のガード（公開版で配置比率が 6.9e18 と表示された不具合の回帰） ====
+   原因は2つ：(1) 比率基準の無いサービス（通所）で軸域を「現在の比率」から作っていたため、
+   端まで動かすたびに軸が広がり発散した。(2) 核（介護・看護）が0に近づくと 利用者÷核 が
+   極大化し、Infinity 経由で核が0に潰れて操作不能になった。
+   探索1万件では端点（f=0/1）を踏まないため捕まらなかった。ここで明示的に端を踏む。 */
+const SERVICES_ALL = ["tokuyou", "unit", "roken", "tsuusho"];
+/* 画面テキスト（script要素を除く）に異常表記が出ていないか */
+function screenAnomalies(d) {
+  const out = [];
+  d.querySelectorAll("body *").forEach(el => {
+    if (el.tagName === "SCRIPT" || el.children.length) return;
+    const s = (el.textContent || "").trim();
+    if (/NaN|Infinity|[0-9]e\+[0-9]/.test(s) || /[0-9]{13,}/.test(s.replace(/[,\s]/g, ""))) out.push(s.slice(0, 60));
+  });
+  return out;
+}
+
+test("ZERO-01 バーの最小・最大・往復を全サービスで踏んでも発散しない", () => {
+  for (const svc of SERVICES_ALL) {
+    const t = open();
+    t.svc(svc);
+    const seen = [];
+    /* 端点・極小値に加えて「左端を連続で踏む」列を入れる。実際のドラッグは1ジェスチャで
+       多数の input を出すため、軸が現在値に追従する実装だと 1.4倍ずつ広がって発散する
+       （公開版の 6.9e18 はこの経路）。往復だけでは再現しないので連続押しを必ず含める。 */
+    const seq = [0, 1, 0, 1, 0.5, 0.002, 0.998];
+    for (let i = 0; i < 40; i++) seq.push(0);      // 左端を連続40回（＝ドラッグ1回分の途中経過）
+    for (let i = 0; i < 40; i++) seq.push(1);      // 右端も連続で
+    for (const f of seq) {
+      slide(t, f);
+      const c = stateOf(t);
+      if (c.ratioActual != null) seen.push(c.ratioActual);
+      assert.ok(c.coreN > 0, `${svc} f=${f}: 介護・看護が0に潰れた（coreN=${c.coreN}）`);
+      assert.ok(Number.isFinite(c.fteAll) && c.fteAll > 0, `${svc} f=${f}: 職員数が壊れた（${c.fteAll}）`);
+      assert.ok(c.ratioActual == null || (Number.isFinite(c.ratioActual) && c.ratioActual < 1e3),
+        `${svc} f=${f}: 配置比率が発散した（${c.ratioActual}）`);
+    }
+    // 端点を繰り返し踏んでも比率の最大値が増え続けない（軸が滑らない）
+    const mx = Math.max(...seen);
+    assert.ok(mx < 1e3, `${svc}: 比率が発散（最大 ${mx}）`);
+    assert.equal(screenAnomalies(t.d).length, 0, `${svc}: 画面に異常表記 ${screenAnomalies(t.d).join(" | ")}`);
+    assert.ok(t.d.querySelectorAll("#chart *").length > 10, `${svc}: 端点操作後にグラフが壊れた`);
+  }
+});
+
+test("ZERO-02 介護・看護が0でも比率を数値で出さず、画面が壊れない（復帰もできる）", () => {
+  const t = open();
+  t.row(0, "n", 0); t.row(1, "n", 0);           // 介護・看護を0に手入力
+  const c = stateOf(t);
+  assert.equal(c.ratioActual, null, `核0で比率が数値になっている: ${c.ratioActual}`);
+  assert.equal(t.d.getElementById("o-ratiobar").textContent, "–", `バーの比率が「–」でない`);
+  assert.ok(!t.txt("#ratiobar").includes("0.00 : 1"), `指標バーに「0.00 : 1」が出ている`);
+  assert.equal(screenAnomalies(t.d).length, 0, `画面に異常表記: ${screenAnomalies(t.d).join(" | ")}`);
+  // 核0のままスライダーを動かしても潰れたまま壊れない
+  slide(t, 1); slide(t, 0);
+  assert.equal(screenAnomalies(t.d).length, 0, `核0でのスライダー操作後に異常表記`);
+  // 「不足職種を基準まで埋める」で復帰できる（0からでも詰まない）
+  t.click("fill-std");
+  assert.ok(stateOf(t).coreN > 0, `核0から復帰できない（fill-std後も coreN=${stateOf(t).coreN}）`);
+});
+
+test("ZERO-03 利用者0（定員0・稼働率0）でも壊れず、描けない理由を出す", () => {
+  for (const [tag, id] of [["稼働率0", "sz-occ"], ["定員0", "sz-cap"]]) {
+    const t = open();
+    t.set(id, 0);
+    slide(t, 0); slide(t, 1);                      // 端点も踏む
+    const c = stateOf(t);
+    assert.equal(c.users, 0, `${tag}: 前提（利用者0）が成立していない`);
+    assert.equal(c.ratioActual, null, `${tag}: 利用者0で比率が数値になっている`);
+    assert.equal(screenAnomalies(t.d).length, 0, `${tag}: 画面に異常表記 ${screenAnomalies(t.d).join(" | ")}`);
+    assert.ok(t.d.querySelector('#chart [data-o="nochart"]'), `${tag}: 曲線を描けない理由が出ていない`);
+  }
+});
+
+test("ZERO-04 収益0・人件費0・派遣費が総額と同額でも異常表記を出さない", () => {
+  for (const [tag, id, v] of [["収益0", "rev", 0], ["人件費0", "total", 0], ["派遣費=総額", "haken-fee", 99999]]) {
+    const t = open();
+    t.set(id, v);
+    slide(t, 0); slide(t, 1);
+    assert.equal(screenAnomalies(t.d).length, 0, `${tag}: 画面に異常表記 ${screenAnomalies(t.d).join(" | ")}`);
+  }
+});
