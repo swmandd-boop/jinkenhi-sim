@@ -481,3 +481,66 @@ test("ZERO-04 収益0・人件費0・派遣費が総額と同額でも異常表�
     assert.equal(screenAnomalies(t.d).length, 0, `${tag}: 画面に異常表記 ${screenAnomalies(t.d).join(" | ")}`);
   }
 });
+
+/* ==== 案B（2026-07-28）: 横軸は職員数に統一し、配置比率は法令の比率基準があるサービスでのみ併記 ====
+   通所介護の人員基準は「利用者15人まで1、超過5人ごとに+1を提供時間帯を通じて」で、対利用者の
+   比率という形をしていない。比率目盛り・基準線・比率スライダー・基準割れ表示を出さないこと。 */
+function chartFacts(t) {
+  const d = t.d;
+  return {
+    ratioTicks: d.querySelectorAll('#chart [data-rt]').length,
+    headTicks:  d.querySelectorAll('#chart [data-nt]').length,
+    baseLines:  [...d.querySelectorAll("#chart line")].filter(e => e.getAttribute("stroke") === "#B23A2E").length,
+    legendBaseHidden: d.getElementById("lg-base").hidden,
+    note:  d.getElementById("chartnote").textContent,
+    label: d.getElementById("scale-label").textContent.replace(/\s+/g, " ").trim()
+  };
+}
+
+test("AXB-01 通所介護では比率目盛り・基準線・凡例の基準線・比率スライダーを出さない", () => {
+  const t = open();
+  t.svc("tsuusho");
+  const f = chartFacts(t);
+  assert.equal(f.ratioTicks, 0, `通所で上段の比率目盛りが出ている（${f.ratioTicks}件）`);
+  assert.ok(f.headTicks >= 3, `通所で常勤換算数の目盛りが出ていない（${f.headTicks}件）`);
+  assert.equal(f.baseLines, 0, `通所で基準線が描かれている（${f.baseLines}本）`);
+  assert.equal(f.legendBaseHidden, true, `通所で凡例の「基準線」が残っている`);
+  assert.ok(!f.label.includes("配置比率"), `通所のスライダーが比率ラベルのまま: ${f.label}`);
+  assert.ok(f.label.includes("職員数"), `通所のスライダーが職員数主表示でない: ${f.label}`);
+  assert.ok(!f.note.includes("基準割れ"), `通所の説明に「基準割れ」が残っている`);
+  /* 指標バーの比率セルは「非表示リスト」に含まれていないため残す（法令基準との比較はせず
+     『常勤換算ベース』と添えるだけの記述統計）。ただし基準の主張は一切しないことを固定する。 */
+  const bar = t.txt("#ratiobar");
+  assert.ok(!/基準\s*[\d.]+\s*:\s*1/.test(bar), `通所の指標バーが比率の基準を主張している: ${bar}`);
+  assert.ok(!t.d.querySelector("#ratiobar .cell.warn"), `通所の指標バーが基準割れ警告を出している`);
+});
+
+test("AXB-02 通所の軸域はドラッグで動かない（基準の単純合計にアンカー）", () => {
+  const t = open();
+  t.svc("tsuusho");
+  const std0 = stateOf(t).stdN;
+  const readTicks = () => [...t.d.querySelectorAll('#chart [data-nt]')].map(e => e.textContent).join(",");
+  const ticks0 = readTicks();
+  // 端点・往復を含めて動かす
+  for (const f of [0, 1, 0.5, 1, 0, 0.25, 1, 0]) slide(t, f);
+  assert.equal(stateOf(t).stdN, std0, `ドラッグで基準の単純合計が変わった（アンカーが動く）`);
+  assert.equal(readTicks(), ticks0, `ドラッグで横軸の目盛りが変わった（軸域が動いている）\n前:${ticks0}\n後:${readTicks()}`);
+  // 同じつまみ位置に戻れば同じ職員数に戻る（軸が固定である帰結）
+  slide(t, 0); const a = stateOf(t).n;
+  slide(t, 1); slide(t, 0); const b = stateOf(t).n;
+  assert.ok(Math.abs(a - b) < 1e-6, `同じつまみ位置で職員数が再現しない: ${a} vs ${b}`);
+});
+
+test("AXB-03 比率基準のあるサービスは従来表示を維持する", () => {
+  for (const svc of ["tokuyou", "unit", "roken"]) {
+    const t = open();
+    t.svc(svc);
+    const f = chartFacts(t);
+    assert.ok(f.ratioTicks >= 3, `${svc}: 上段の比率目盛りが減った（${f.ratioTicks}件）`);
+    assert.equal(f.baseLines, 1, `${svc}: 基準線が1本でない（${f.baseLines}本）`);
+    assert.equal(f.legendBaseHidden, false, `${svc}: 凡例の「基準線」が消えた`);
+    assert.ok(f.label.includes("配置比率"), `${svc}: スライダーの比率ラベルが消えた: ${f.label}`);
+    assert.ok(f.note.includes("配置比率") && f.note.includes("基準割れ"), `${svc}: 説明から比率／基準割れが消えた`);
+    assert.ok(t.txt("#ratiobar").includes(": 1"), `${svc}: 指標バーの比率セルが消えた`);
+  }
+});
