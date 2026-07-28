@@ -951,6 +951,13 @@ test("CLAIM-02 金額を出す表示に「万円」だけで終わる箇所が�
       const bad = s.match(/万円(?!／年)/g);
       assert.equal(bad, null, `${svc} ${sel}: 「万円」で終わる金額が ${bad && bad.length} 件ある → ${s.slice(0, 200)}`);
     }
+    /* グラフ内の文字（SVG text）も金額を出す。DOM の6ブロックだけ見ていると、
+       賃金下限ラベルの「事業主負担込み ◯万円」のような後半の金額を取りこぼす。 */
+    for (const e of t.d.querySelectorAll("#chart text")) {
+      const s = e.textContent;
+      const bad = s.match(/万円(?!／年)/g);
+      assert.equal(bad, null, `${svc} グラフ内: 「万円」で終わる金額が ${bad && bad.length} 件ある → ${s}`);
+    }
   }
 });
 

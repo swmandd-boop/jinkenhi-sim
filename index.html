@@ -1343,7 +1343,7 @@ function renderChart(c){
   /* 賃金下限（横線）＝額面入力を事業主負担込み floorA に換算した位置。ラベルは両方を併記して誤読を防ぐ。 */
   if (c.atgt > 0 && c.floorA < ymax){
     svg.appendChild(el("line",{x1:VB.l,x2:VB.l+PW,y1:Y(c.floorA),y2:Y(c.floorA),stroke:"#1B4965","stroke-width":1.4,"stroke-dasharray":"6 4","data-o":"wage"}));
-    svg.appendChild(el("text",{x:VB.l+PW-4,y:Y(c.floorA)-6,"text-anchor":"end","font-size":10.5,fill:"#1B4965"},"賃金下限 "+n1(c.atgt)+"万円／年（事業主負担込み "+n1(c.floorA)+"万円）"));
+    svg.appendChild(el("text",{x:VB.l+PW-4,y:Y(c.floorA)-6,"text-anchor":"end","font-size":10.5,fill:"#1B4965"},"賃金下限 "+n1(c.atgt)+"万円／年（事業主負担込み "+n1(c.floorA)+"万円／年）"));
   }
 
   /* いまの置き方の点（職員数 fteAll × 1人あたり給与費 A） */
