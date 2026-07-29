@@ -930,7 +930,7 @@ function moneyClaims(t){
   ];
 }
 
-test("CLAIM-01 engine の金額は画面上で「万円／年」を伴って出る（4サービス）", () => {
+test("UNIT-01 engine の金額は画面上で「万円／年」を伴って出る（4サービス）", () => {
   for (const svc of ["tsuusho", "tokuyou", "unit", "roken"]) {
     const t = open();
     t.svc(svc);
@@ -941,7 +941,7 @@ test("CLAIM-01 engine の金額は画面上で「万円／年」を伴って出�
   }
 });
 
-test("CLAIM-02 金額を出す表示に「万円」だけで終わる箇所が無い（人数・率・ポイントは対象外）", () => {
+test("UNIT-02 金額を出す表示に「万円」だけで終わる箇所が無い（人数・率・ポイントは対象外）", () => {
   for (const svc of ["tsuusho", "tokuyou", "unit", "roken"]) {
     const t = open();
     t.svc(svc);
@@ -962,7 +962,7 @@ test("CLAIM-02 金額を出す表示に「万円」だけで終わる箇所が�
   }
 });
 
-test("CLAIM-03 「いま動かすと何が起きるか」は1人あたりと法人全体を書き分ける", () => {
+test("UNIT-03 「いま動かすと何が起きるか」は1人あたりと法人全体を書き分ける", () => {
   const t = open();
   const s = t.txt("#marginal");
   assert.ok(s.includes("1人あたり給与費 −"), `1人あたりの行が無い: ${s.slice(0, 150)}`);
@@ -989,10 +989,10 @@ test("PUB-04 入力欄の初期値は「入力例」と呼び、「未検証」�
 
 /* 判断保留の処理（2026-07-29・水田さん判断）
    E: §5・§6 の促し文の金額も「万円／年」にそろえる（未入力状態でしか出ないため
-      CLAIM-02 の網に掛かっていなかった）
+      UNIT-02 の網に掛かっていなかった）
    F: 法定福利費率は値を残し「確かめ方」を併記する。ただし サンプル・未検証 の明示は維持
    D: 単価（1人1日あたり収入）は年額に揃えず、ラベルに期間を明記する例外 */
-test("CLAIM-04 未入力状態の促し文でも金額の単位は「万円／年」", () => {
+test("UNIT-04 未入力状態の促し文でも金額の単位は「万円／年」", () => {
   for (const svc of ["tsuusho", "tokuyou", "unit", "roken"]) {
     const t = open();                       // atgt は初期値のまま＝未入力状態
     t.svc(svc);

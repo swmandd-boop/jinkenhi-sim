@@ -1,0 +1,190 @@
+/**
+ * claims.test.mjs — 画面整合の機械検査（参照実装）
+ *
+ * release-gate STAGE 1.6 に対応するテスト。
+ * 「同じ画面の2つの表示が違うことを言っていないか」を機械で確認する。
+ *
+ * 【使い方】
+ * 1. CLAIMS の定義を、対象ツールの主張に置き換える
+ * 2. PAIRS に、矛盾してはならない対を定義する
+ * 3. npm run check に含める
+ *
+ * 【設計の要点】
+ * - 主張は engine（計算層）が真偽値として返す。UI層で判定しない
+ * - 網羅性チェックが「PAIRS に出てこない主張」を検出する（E-016）
+ * - 端点は連続で踏む（1回では発散しない不具合がある）
+ */
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { JSDOM } from "jsdom";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+/* ============================================================
+   1.6-1 主張の列挙
+   engine の返り値から導出する。UI層で判定しているものがあれば
+   ここに書けない＝設計の問題として検出される
+   ============================================================ */
+
+/**
+ * @param {object} c - engine.calcState() の返り値
+ * @param {Document} d - 描画後の DOM
+ * @returns {Record<string, boolean>} 主張名 → 真偽
+ */
+function claims(c, d) {
+  return {
+    // --- engine 側の主張（計算の結論） ---
+    hasBand:        isFinite(c.nCap) && c.nCap > c.nmin,      // 成立区間がある
+    isCompliant:    c.shorts.length === 0 && !c.blocked,      // 職種別を満たす
+    ratioOk:        !c.ratioBad,                              // 比率が基準内
+    hasSurplus:     c.n >= c.nmin,                            // 配置に余裕がある
+
+    // --- UI 側の観測（描画された結果） ---
+    bandDrawn:      !!d.querySelector('[data-band]'),         // 帯が描かれている
+    shortListEmpty: d.querySelectorAll('[data-short]').length === 0,
+    ratioWarned:    !!d.querySelector('.cell.warn'),
+    noBandTextShown: /両立する区間なし|区間なし/.test(
+                       d.querySelector('#chart')?.textContent ?? ""),
+  };
+}
+
+/* ============================================================
+   1.6-2 主張どうしの整合
+   左辺 ⟺ 右辺 が常に成り立つこと
+   ============================================================ */
+
+const PAIRS = [
+  ["hasBand",     "bandDrawn",       "区間がある ⟺ 帯が描画される"],
+  ["hasBand",     "!noBandTextShown","区間がある ⟺ 「区間なし」が出ない"],
+  ["isCompliant", "shortListEmpty",  "充足している ⟺ 不足リストが空"],
+  ["ratioOk",     "!ratioWarned",    "比率が基準内 ⟺ 警告色でない"],
+];
+
+/* ============================================================
+   走査対象：全サービス × 境界値 × 偏った構成
+   ============================================================ */
+
+const SERVICES = ["tokuyou", "unit", "roken", "tsuusho"];
+
+const PATTERNS = [
+  { name: "初期状態",       mutate: (I) => I },
+  { name: "端点・左",       mutate: (I) => ({ ...I, knob: 0 }) },
+  { name: "端点・右",       mutate: (I) => ({ ...I, knob: 1 }) },
+  { name: "偏った構成",     mutate: (I) => ({ ...I,
+      rows: I.rows.map((r, i) => i === 0 ? { ...r, n: r.n * 0.3 } : r) }) },
+  { name: "その他だけ薄い", mutate: (I) => ({ ...I,
+      rows: I.rows.map((r) => r.key === "other" ? { ...r, n: r.n * 0.4 } : r) }) },
+  { name: "賃金下限が高い", mutate: (I) => ({ ...I, atgt: 900 }) },
+  { name: "賃金下限が0",    mutate: (I) => ({ ...I, atgt: 0 }) },
+  { name: "基準職種が0",    mutate: (I) => ({ ...I,
+      rows: I.rows.map((r) => r.std > 0 ? { ...r, n: 0, hi: 0 } : r) }) },
+];
+
+/* ============================================================
+   テスト本体
+   ============================================================ */
+
+function evalPair(v, key) {
+  return key.startsWith("!") ? !v[key.slice(1)] : v[key];
+}
+
+test("CLAIM-01 主張どうしが矛盾しない（全サービス × 全パターン）", () => {
+  const violations = [];
+  for (const svc of SERVICES) {
+    for (const p of PATTERNS) {
+      const { c, d } = render(svc, p.mutate);
+      const v = claims(c, d);
+      for (const [lhs, rhs, label] of PAIRS) {
+        if (evalPair(v, lhs) !== evalPair(v, rhs)) {
+          violations.push(`${svc} / ${p.name} / ${label}` +
+            `（${lhs}=${evalPair(v, lhs)} ≠ ${rhs}=${evalPair(v, rhs)}）`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(violations, [], "\n" + violations.join("\n"));
+});
+
+test("CLAIM-02 網羅性：突き合わせていない主張がない（E-016）", () => {
+  const { c, d } = render(SERVICES[0], (I) => I);
+  const all = Object.keys(claims(c, d));
+  const covered = new Set(PAIRS.flatMap(([l, r]) =>
+    [l, r].map((k) => k.replace(/^!/, ""))));
+  const uncovered = all.filter((k) => !covered.has(k));
+  assert.deepEqual(uncovered, [],
+    `\n次の主張が PAIRS に出てきません。整合条件を定義するか、` +
+    `主張でないなら claims() から外してください：\n  ${uncovered.join("\n  ")}`);
+});
+
+test("CLAIM-03 端点を連続で踏んでも壊れない", () => {
+  // 1回踏むだけでは発散しない不具合がある（探索1万件が見逃した実例）
+  for (const svc of SERVICES) {
+    const { c, d } = render(svc, (I) => {
+      let x = I;
+      for (let i = 0; i < 40; i++) x = { ...x, knob: i % 2 === 0 ? 0 : 1 };
+      return x;
+    });
+    const v = claims(c, d);
+    for (const [k, val] of Object.entries(v)) {
+      assert.equal(typeof val, "boolean", `${svc} ${k} が真偽値でない`);
+    }
+    assert.ok(!/NaN|Infinity|undefined/.test(d.body.textContent),
+      `${svc} 画面に NaN/Infinity/undefined が出ている`);
+  }
+});
+
+test("CLAIM-04 UI層に判定式が書かれていない（E-015）", () => {
+  // 主張は engine が返すもの。UI が独自に判定していたら二重管理
+  const html = readFileSync(resolve(root, "index.html"), "utf8");
+  const uiStart = html.indexOf("SWMD-UI:BEGIN");
+  const uiEnd = html.indexOf("SWMD-UI:END");
+  assert.ok(uiStart > 0 && uiEnd > uiStart, "UI区間のマーカーが見つからない");
+  const ui = html.slice(uiStart, uiEnd)
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+
+  // UI層で比較演算を使った判定を検出（表示の分岐は許容、判定は不可）
+  const suspicious = [
+    /\bshorts\s*\.\s*length\s*[<>=]/,     // 不足の再判定
+    /\bratio\w*\s*[<>]=?\s*\d/,           // 比率の再判定
+    /\bn\w*\s*>=\s*n(min|base|Cap)/i,     // 成立範囲の再判定
+  ];
+  const hits = suspicious.filter((re) => re.test(ui));
+  assert.deepEqual(hits.map(String), [],
+    "\nUI層に判定式があります。engine に移して真偽値を受け取ってください");
+});
+
+/* ============================================================
+   描画ヘルパ（対象ツールに合わせて差し替える）
+   ============================================================ */
+
+function render(service, mutate) {
+  const dom = new JSDOM(readFileSync(resolve(root, "index.html"), "utf8"),
+    { runScripts: "dangerously", pretendToBeVisual: true });
+  const d = dom.window.document;
+  const fire = (el, t) => el.dispatchEvent(new dom.window.Event(t, { bubbles: true }));
+
+  const sel = d.getElementById("svc");
+  sel.value = service;
+  fire(sel, "change");
+
+  // mutate が返す差分を DOM 操作に翻訳する
+  // （knob / atgt / rows など、対象ツールの入力に合わせて実装）
+  const I = mutate({ knob: null, atgt: null, rows: null });
+  if (I.knob != null) {
+    const bar = d.getElementById("scale");
+    bar.value = String(I.knob);
+    fire(bar, "input");
+  }
+  if (I.atgt != null) {
+    const a = d.getElementById("atgt");
+    a.value = String(I.atgt);
+    fire(a, "input");
+  }
+
+  const c = dom.window.__SWMD_STATE();
+  return { c, d };
+}
